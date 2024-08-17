@@ -30,7 +30,6 @@ docker-compose up -d
 
 ```bash
 cargo install sqlx-cli
-cargo build
 sqlx migrate run
 ```
 
