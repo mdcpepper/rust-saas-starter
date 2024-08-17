@@ -9,12 +9,16 @@ use zxcvbn::{zxcvbn, Score};
 #[derive(Debug, Error)]
 pub enum PasswordError {
     /// Password is too short
-    #[error("password is too short")]
+    #[error("Your password is too short. It must be at least 8 characters long.")]
     TooShort,
 
+    /// Password is too long
+    #[error("Your password is too long. It must be at most 100 characters long.")]
+    TooLong,
+
     /// Password is too weak
-    #[error("password is too weak")]
-    TooWeak,
+    #[error("Your password is too weak.")]
+    TooWeak(Vec<String>),
 }
 
 /// Password
@@ -28,8 +32,23 @@ impl Password {
             return Err(PasswordError::TooShort);
         }
 
-        if zxcvbn(raw, &[]).score() < Score::Three {
-            return Err(PasswordError::TooWeak);
+        if raw.len() > 100 {
+            return Err(PasswordError::TooLong);
+        }
+
+        let entropy = zxcvbn(raw, &[]);
+        if entropy.score() < Score::Three {
+            let suggestions = if let Some(feedback) = entropy.feedback() {
+                feedback
+                    .suggestions()
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>()
+            } else {
+                vec!["Please choose a stronger password.".to_string()]
+            };
+
+            return Err(PasswordError::TooWeak(suggestions));
         }
 
         Ok(Self(raw.to_string()))
@@ -74,9 +93,16 @@ mod tests {
     }
 
     #[test]
+    fn test_new_password_too_long() {
+        let result = Password::new(&"a".repeat(101));
+        assert!(result.is_err());
+        assert!(matches!(result, Err(PasswordError::TooLong)))
+    }
+
+    #[test]
     fn test_new_password_too_weak() {
         let result = Password::new("weakpassword");
         assert!(result.is_err());
-        assert!(matches!(result, Err(PasswordError::TooWeak)))
+        assert!(matches!(result, Err(PasswordError::TooWeak(_))));
     }
 }
