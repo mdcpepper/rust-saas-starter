@@ -1,5 +1,6 @@
 //! Postgres module
 
+use anyhow::Result;
 use clap::Parser;
 use sqlx::PgPool;
 
@@ -12,14 +13,9 @@ pub struct PostgresDatabase {
 
 impl PostgresDatabase {
     /// Create a new database connection
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
-    }
-
-    /// Create a new database connection with a URL
-    pub async fn new_with_url(url: &str) -> anyhow::Result<Self> {
+    pub async fn new(connection_string: &str) -> Result<Self> {
         Ok(Self {
-            pool: PgPool::connect(url).await?,
+            pool: PgPool::connect(connection_string).await?,
         })
     }
 

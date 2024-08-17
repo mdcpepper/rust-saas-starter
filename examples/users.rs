@@ -19,13 +19,13 @@ pub struct Args {
 #[tokio::main]
 pub async fn main() -> Result<()> {
     if let Err(e) = dotenvy::dotenv() {
-        eprintln!("Failed to load .env file: {}", e);
+        eprintln!("Failed to load environment: {}", e);
         return Err(e.into());
     }
 
     let args = Args::parse();
 
-    let database = PostgresDatabase::new_with_url(&args.db.connection_string)
+    let database = PostgresDatabase::new(&args.db.connection_string)
         .await
         .context("Failed to connect to the database")?;
 

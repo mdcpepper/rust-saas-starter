@@ -1,5 +1,7 @@
 //! User service module.
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use uuid::Uuid;
 
@@ -10,7 +12,7 @@ use crate::domain::auth::{
 
 /// User service
 #[async_trait]
-pub trait UserManagement: Send + Sync + 'static {
+pub trait UserManagement: Clone + Send + Sync + 'static {
     /// Creates a new user based on the provided request details.
     ///
     /// # Arguments
@@ -28,7 +30,7 @@ pub struct UserService<R>
 where
     R: UserRepository,
 {
-    repo: R,
+    repo: Arc<R>,
 }
 
 impl<R> UserService<R>
@@ -36,7 +38,7 @@ where
     R: UserRepository,
 {
     /// Create a new user service
-    pub fn new(repo: R) -> Self {
+    pub fn new(repo: Arc<R>) -> Self {
         Self { repo }
     }
 }
@@ -53,6 +55,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use anyhow::anyhow;
     use mockall::predicate::eq;
     use testresult::TestResult;
@@ -82,7 +86,7 @@ mod tests {
             .with(eq(request.clone()))
             .returning(move |_| Ok(expected_id));
 
-        let service = UserService::new(mock);
+        let service = UserService::new(Arc::new(mock));
 
         let user_id = service.create_user(&request).await?;
 
@@ -112,7 +116,7 @@ mod tests {
                 })
             });
 
-        let service = UserService::new(mock);
+        let service = UserService::new(Arc::new(mock));
 
         let result = service.create_user(&request).await;
 
@@ -138,7 +142,7 @@ mod tests {
             .with(eq(request.clone()))
             .returning(move |_req| Err(CreateUserError::UnknownError(anyhow!("Unknown error"))));
 
-        let service = UserService::new(mock);
+        let service = UserService::new(Arc::new(mock));
 
         let result = service.create_user(&request).await;
 
