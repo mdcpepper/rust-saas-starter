@@ -71,7 +71,7 @@ mod tests {
         let request = CreateUserRequest::new(
             user_id,
             EmailAddress::new("email@example.com")?,
-            Password::new("password")?,
+            Password::new("correcthorsebatterystaple")?,
         );
         let expected_id = request.id().clone();
 
@@ -97,7 +97,7 @@ mod tests {
         let request = CreateUserRequest::new(
             user_id,
             EmailAddress::new("email@example.com")?,
-            Password::new("password")?,
+            Password::new("correcthorsebatterystaple")?,
         );
         let email = request.email().clone();
 
@@ -128,7 +128,7 @@ mod tests {
         let request = CreateUserRequest::new(
             user_id,
             EmailAddress::new("email@example.com")?,
-            Password::new("password")?,
+            Password::new("correcthorsebatterystaple")?,
         );
 
         let mut mock = MockUserRepository::new();
