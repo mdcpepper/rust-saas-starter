@@ -88,3 +88,26 @@ pub enum CreateUserError {
     #[error(transparent)]
     UnknownError(#[from] anyhow::Error),
 }
+
+#[cfg(test)]
+mod tests {
+    use testresult::TestResult;
+    use uuid::Uuid;
+
+    use crate::domain::auth::value_objects::{email_address::EmailAddress, password::Password};
+
+    use super::CreateUserRequest;
+
+    #[test]
+    fn create_user_request_hashes_password() -> TestResult {
+        let create_user = CreateUserRequest::new(
+            Uuid::now_v7(),
+            EmailAddress::new("email@example.com")?,
+            Password::new("correcthorsebatterystaple")?,
+        );
+
+        assert_ne!(create_user.password_hash(), "correcthorsebatterystaple");
+
+        Ok(())
+    }
+}

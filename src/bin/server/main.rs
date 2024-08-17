@@ -18,6 +18,7 @@ pub struct Args {
     pub db: DatabaseConnectionDetails,
 }
 
+#[mutants::skip]
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     if let Err(e) = dotenvy::dotenv() {

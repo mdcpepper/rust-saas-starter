@@ -47,3 +47,38 @@ impl From<Error> for ApiError {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::usize;
+
+    use anyhow::anyhow;
+    use axum::{body::to_bytes, http::StatusCode, response::IntoResponse};
+    use testresult::TestResult;
+
+    use super::ApiError;
+
+    #[tokio::test]
+    async fn test_error_response() -> TestResult {
+        let error = ApiError {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            message: "Internal server error".to_string(),
+        };
+
+        let response = error.into_response();
+        let body = to_bytes(response.into_body(), usize::MAX).await?;
+
+        assert_eq!(body, r#"{"error":"Internal server error"}"#);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_api_error_from_error() {
+        let error = anyhow!("Internal server error");
+        let api_error = ApiError::from(error);
+
+        assert_eq!(api_error.status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(api_error.message, "Internal server error");
+    }
+}

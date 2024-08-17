@@ -59,6 +59,7 @@ impl HttpServer {
     }
 
     /// Runs the HTTP server.
+    #[mutants::skip]
     pub async fn run(self) -> anyhow::Result<()> {
         debug!("listening on {}", self.listener.local_addr().unwrap());
 

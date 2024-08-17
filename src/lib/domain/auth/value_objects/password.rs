@@ -79,9 +79,34 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_password_display_obfuscates() -> TestResult {
+        let password = Password::new("correcthorsebatterystaple")?;
+        assert_eq!(format!("{}", password), "********");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_password_debug_obfuscates() -> TestResult {
+        let password = Password::new("correcthorsebatterystaple")?;
+        assert_eq!(format!("{:?}", password), "********");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_password_as_bytes() -> TestResult {
+        let password = Password::new("correcthorsebatterystaple")?;
+        assert_eq!(password.as_bytes(), b"correcthorsebatterystaple");
+
+        Ok(())
+    }
+
+    #[test]
     fn test_new_password() -> TestResult {
         let password = Password::new("correcthorsebatterystaple")?;
         assert_eq!(password.to_string(), "********");
+
         Ok(())
     }
 
