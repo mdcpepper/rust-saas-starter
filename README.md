@@ -4,14 +4,13 @@ This is a starter kit for building a SaaS application with Rust and Postgres.
 
 It is a work in progress and is **not yet ready for production use**.
 
-Based partly on https://www.howtocodeit.com/articles/master-hexagonal-architecture-rust
+Based partly on [Master Hexagonal Architecture in Rust](https://www.howtocodeit.com/articles/master-hexagonal-architecture-rust).
 
 ## Requirements
 
 - Rust
 - Docker
 - Docker Compose
-- SQLx CLI
 
 ## Setup
 
@@ -30,6 +29,8 @@ docker-compose up -d
 3. Run the migrations:
 
 ```bash
+cargo install sqlx-cli
+cargo build
 sqlx migrate run
 ```
 

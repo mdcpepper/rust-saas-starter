@@ -1,5 +1,12 @@
 //! Email Address
 
+use lazy_static::lazy_static;
+use regex::Regex;
+
+lazy_static! {
+    static ref EMAIL_REGEX: Regex = Regex::new(r"^[^@\s]*?@[^@\s]*?\.[^@\s]*$").unwrap();
+}
+
 use std::fmt;
 
 use thiserror::Error;
@@ -31,8 +38,8 @@ impl EmailAddress {
             return Err(EmptyEmailAddress);
         }
 
-        if !trimmed.contains('@') {
-            return Err(InvalidEmailAddress);
+        if !EMAIL_REGEX.is_match(trimmed) {
+            return Err(EmailAddressError::InvalidEmailAddress);
         }
 
         Ok(Self(trimmed.to_string()))

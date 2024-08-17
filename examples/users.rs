@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Parser;
 use rust_saas_starter::{
     domain::auth::{
@@ -17,13 +17,16 @@ pub struct Args {
 
 #[tokio::main]
 pub async fn main() -> Result<()> {
-    dotenvy::dotenv().ok();
+    if let Err(e) = dotenvy::dotenv() {
+        eprintln!("Failed to load .env file: {}", e);
+        return Err(e.into());
+    }
 
     let args = Args::parse();
 
     let database = PostgresDatabase::new_with_url(&args.db.connection_string)
         .await
-        .expect("Failed to connect to the database");
+        .context("Failed to connect to the database")?;
 
     let create_user =
         CreateUserRequest::new(Uuid::now_v7(), EmailAddress::new("email@example.com")?);

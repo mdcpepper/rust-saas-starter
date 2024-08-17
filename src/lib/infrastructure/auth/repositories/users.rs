@@ -2,7 +2,7 @@
 
 use anyhow::anyhow;
 use async_trait::async_trait;
-use sqlx::{error::ErrorKind::UniqueViolation, query};
+use sqlx::{error::ErrorKind::UniqueViolation, query, Error::Database};
 use uuid::Uuid;
 
 use crate::{
@@ -28,18 +28,16 @@ impl UserRepository for PostgresDatabase {
         )
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| {
-            println!("{:#?}", e);
-
-            match e {
-                sqlx::Error::Database(db_error) => match db_error.kind() {
-                    UniqueViolation => CreateUserError::Duplicate {
-                        email: req.email().clone(),
-                    },
-                    _ => CreateUserError::UnknownError(anyhow!("Unknown something error")),
+        .map_err(|e| match e {
+            Database(db_error) => match db_error.kind() {
+                UniqueViolation => CreateUserError::DuplicateUser {
+                    email: req.email().clone(),
                 },
-                _ => CreateUserError::UnknownError(anyhow!("Unknown something else error")),
-            }
+                _ => {
+                    CreateUserError::UnknownError(anyhow!("Unknown database error: {:?}", db_error))
+                }
+            },
+            _ => CreateUserError::UnknownError(anyhow!("Unknown database error: {:?}", e)),
         })?;
 
         Ok(result.id)

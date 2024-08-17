@@ -99,7 +99,7 @@ mod tests {
             .times(1)
             .with(eq(request.clone()))
             .returning(move |_req| {
-                Err(CreateUserError::Duplicate {
+                Err(CreateUserError::DuplicateUser {
                     email: email.clone(),
                 })
             });
@@ -109,7 +109,7 @@ mod tests {
         let result = service.create_user(&request).await;
 
         assert!(result.is_err());
-        assert!(matches!(result, Err(CreateUserError::Duplicate { .. })));
+        assert!(matches!(result, Err(CreateUserError::DuplicateUser { .. })));
 
         Ok(())
     }

@@ -64,7 +64,7 @@ impl CreateUserRequest {
 pub enum CreateUserError {
     /// User with email already exists
     #[error("user with email {email} already exists")]
-    Duplicate {
+    DuplicateUser {
         /// Email address
         email: EmailAddress,
     },
