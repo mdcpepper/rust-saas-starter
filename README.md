@@ -34,4 +34,4 @@ cargo build
 sqlx migrate run
 ```
 
-The database can be viewed at http://localhost:8888.
+The database can be viewed using Adminer at http://localhost:8888. Adminer is a lightweight database management tool that provides a web interface for interacting with the database.
