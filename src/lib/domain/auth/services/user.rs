@@ -1,7 +1,6 @@
 //! User service module.
 
-use std::future::Future;
-
+use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::domain::auth::{
@@ -10,6 +9,7 @@ use crate::domain::auth::{
 };
 
 /// User service
+#[async_trait]
 pub trait UserManagement: Send + Sync + 'static {
     /// Creates a new user based on the provided request details.
     ///
@@ -19,10 +19,7 @@ pub trait UserManagement: Send + Sync + 'static {
     /// # Returns
     /// A [`Result`] which is [`Ok`] containing the user's UUID if the user is successfully created,
     /// or an [`Err`] containing a [`CreateUserError`] if the user cannot be created.
-    fn create_user(
-        &self,
-        req: &CreateUserRequest,
-    ) -> impl Future<Output = Result<Uuid, CreateUserError>> + Send;
+    async fn create_user(&self, req: &CreateUserRequest) -> Result<Uuid, CreateUserError>;
 }
 
 /// User service implementation
@@ -44,6 +41,7 @@ where
     }
 }
 
+#[async_trait]
 impl<R> UserManagement for UserService<R>
 where
     R: UserRepository,
@@ -78,7 +76,7 @@ mod tests {
         mock.expect_create_user()
             .times(1)
             .with(eq(request.clone()))
-            .returning(move |_| Box::pin(async move { Ok(expected_id) }));
+            .returning(move |_| Ok(expected_id));
 
         let service = UserService::new(mock);
 
@@ -101,8 +99,9 @@ mod tests {
             .times(1)
             .with(eq(request.clone()))
             .returning(move |_req| {
-                let email = email.clone();
-                Box::pin(async move { Err(CreateUserError::Duplicate { email }) })
+                Err(CreateUserError::Duplicate {
+                    email: email.clone(),
+                })
             });
 
         let service = UserService::new(mock);
@@ -125,11 +124,7 @@ mod tests {
         mock.expect_create_user()
             .times(1)
             .with(eq(request.clone()))
-            .returning(move |_req| {
-                Box::pin(
-                    async move { Err(CreateUserError::UnknownError(anyhow!("Unknown error"))) },
-                )
-            });
+            .returning(move |_req| Err(CreateUserError::UnknownError(anyhow!("Unknown error"))));
 
         let service = UserService::new(mock);
 

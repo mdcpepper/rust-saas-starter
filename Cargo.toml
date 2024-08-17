@@ -9,6 +9,7 @@ path = "src/lib/lib.rs"
 
 [dependencies]
 anyhow = "1.0.86"
+async-trait = "0.1.81"
 chrono = "0.4.38"
 clap = { version = "4.5.16", features = ["derive", "env"] }
 dotenvy = "0.15.7"

@@ -1,6 +1,7 @@
 //! Postgres implementation of the UserRepository trait
 
 use anyhow::anyhow;
+use async_trait::async_trait;
 use sqlx::{error::ErrorKind::UniqueViolation, query};
 use uuid::Uuid;
 
@@ -12,6 +13,7 @@ use crate::{
     infrastructure::database::postgres::PostgresDatabase,
 };
 
+#[async_trait]
 impl UserRepository for PostgresDatabase {
     #[mutants::skip]
     async fn create_user(&self, req: &CreateUserRequest) -> Result<Uuid, CreateUserError> {
