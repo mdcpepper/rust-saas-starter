@@ -1,6 +1,28 @@
 [package]
-name = "base"
+name = "rust-saas-starter"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "rust_saas_starter"
+path = "src/lib/lib.rs"
+
 [dependencies]
+anyhow = "1.0.86"
+chrono = "0.4.38"
+clap = { version = "4.5.16", features = ["derive", "env"] }
+dotenvy = "0.15.7"
+mockall = "0.13.0"
+mutants = "0.0.3"
+sqlx = { version = "0.8.0", features = [
+    "runtime-tokio",
+    "macros",
+    "postgres",
+    "chrono",
+    "uuid",
+    "migrate",
+] }
+testresult = "0.4.1"
+thiserror = "1.0.63"
+tokio = { version = "1.39.2", features = ["full"] }
+uuid = { version = "1.10.0", features = ["v7"] }
