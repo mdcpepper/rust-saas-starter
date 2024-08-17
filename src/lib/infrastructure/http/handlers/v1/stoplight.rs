@@ -26,22 +26,21 @@ pub async fn handler() -> Html<String> {
 #[cfg(test)]
 mod tests {
     use axum_test::TestServer;
+    use testresult::TestResult;
 
     use crate::{
-        domain::auth::{repositories::user::MockUserRepository, services::user::UserService},
+        domain::auth::repositories::user::MockUserRepository,
         infrastructure::http::{
             router,
-            state::{get_test_state, AppState},
+            state::{get_test_state, MockAppState},
         },
     };
 
     #[tokio::test]
-    async fn test_docs_handler() {
-        let user_repo = MockUserRepository::new();
-        let state: AppState<UserService<MockUserRepository>> = get_test_state(user_repo);
+    async fn test_docs_handler() -> TestResult {
+        let state: MockAppState = get_test_state(MockUserRepository::new());
 
-        let response = TestServer::new(router(state))
-            .unwrap()
+        let response = TestServer::new(router(state))?
             .get("/api/v1")
             .content_type("text/html; charset=utf-8")
             .await;
@@ -52,5 +51,7 @@ mod tests {
 
         assert!(raw_text.contains("SaaS Starter API"));
         assert!(raw_text.contains("/api/v1/openapi.json"));
+
+        Ok(())
     }
 }

@@ -29,6 +29,9 @@ where
 }
 
 #[cfg(test)]
+pub type MockAppState = AppState<UserService<MockUserRepository>>;
+
+#[cfg(test)]
 use crate::domain::auth::{repositories::user::MockUserRepository, services::user::UserService};
 
 #[cfg(test)]
