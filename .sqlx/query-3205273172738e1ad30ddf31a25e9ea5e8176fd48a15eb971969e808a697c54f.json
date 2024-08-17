@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            INSERT INTO users (id, email)\n            VALUES ($1, $2)\n            RETURNING id\n            ",
+  "query": "\n            INSERT INTO users (id, email, password)\n            VALUES ($1, $2, $3)\n            RETURNING id\n            ",
   "describe": {
     "columns": [
       {
@@ -12,6 +12,7 @@
     "parameters": {
       "Left": [
         "Uuid",
+        "Text",
         "Text"
       ]
     },
@@ -19,5 +20,5 @@
       false
     ]
   },
-  "hash": "add103478ccee584a94df131cd41732e1ce6cab15806563f2b89f086e09d4aee"
+  "hash": "3205273172738e1ad30ddf31a25e9ea5e8176fd48a15eb971969e808a697c54f"
 }
