@@ -43,7 +43,7 @@ impl PostgresDatabase {
         Ok(Self {
             pool: PgPool::connect(connection_string)
                 .await
-                .map_err(|err| ConnectionError(err))?,
+                .map_err(ConnectionError)?,
         })
     }
 
