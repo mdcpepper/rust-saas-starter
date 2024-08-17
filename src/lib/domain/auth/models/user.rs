@@ -1,9 +1,10 @@
 //! User model
 
+use password_auth::generate_hash;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::domain::auth::value_objects::email_address::EmailAddress;
+use crate::domain::auth::value_objects::{email_address::EmailAddress, password::Password};
 
 /// User model
 #[derive(Debug)]
@@ -40,12 +41,21 @@ pub struct CreateUserRequest {
 
     /// New user's email address
     email: EmailAddress,
+
+    /// New user's password
+    password_hash: String,
 }
 
 impl CreateUserRequest {
     /// Create a new user request
-    pub fn new(id: Uuid, email: EmailAddress) -> Self {
-        Self { id, email }
+    pub fn new(id: Uuid, email: EmailAddress, password: Password) -> Self {
+        let password_hash = generate_hash(password.as_bytes());
+
+        Self {
+            id,
+            email,
+            password_hash,
+        }
     }
 
     /// Get the new user's ID
@@ -56,6 +66,11 @@ impl CreateUserRequest {
     /// Get the new user's email address
     pub fn email(&self) -> &EmailAddress {
         &self.email
+    }
+
+    /// Get the new user's password hash
+    pub fn password_hash(&self) -> &str {
+        &self.password_hash
     }
 }
 

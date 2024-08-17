@@ -62,13 +62,17 @@ mod tests {
         models::user::{CreateUserError, CreateUserRequest},
         repositories::user::MockUserRepository,
         services::user::{UserManagement, UserService},
-        value_objects::email_address::EmailAddress,
+        value_objects::{email_address::EmailAddress, password::Password},
     };
 
     #[tokio::test]
     async fn test_create_user_success() -> TestResult {
         let user_id = Uuid::now_v7();
-        let request = CreateUserRequest::new(user_id, EmailAddress::new("email@example.com")?);
+        let request = CreateUserRequest::new(
+            user_id,
+            EmailAddress::new("email@example.com")?,
+            Password::new("password")?,
+        );
         let expected_id = request.id().clone();
 
         let mut mock = MockUserRepository::new();
@@ -90,7 +94,11 @@ mod tests {
     #[tokio::test]
     async fn test_create_user_already_exists() -> TestResult {
         let user_id = Uuid::now_v7();
-        let request = CreateUserRequest::new(user_id, EmailAddress::new("email@example.com")?);
+        let request = CreateUserRequest::new(
+            user_id,
+            EmailAddress::new("email@example.com")?,
+            Password::new("password")?,
+        );
         let email = request.email().clone();
 
         let mut mock = MockUserRepository::new();
@@ -117,7 +125,11 @@ mod tests {
     #[tokio::test]
     async fn test_create_user_unknown_error() -> TestResult {
         let user_id = Uuid::now_v7();
-        let request = CreateUserRequest::new(user_id, EmailAddress::new("email@example.com")?);
+        let request = CreateUserRequest::new(
+            user_id,
+            EmailAddress::new("email@example.com")?,
+            Password::new("password")?,
+        );
 
         let mut mock = MockUserRepository::new();
 

@@ -19,12 +19,13 @@ impl UserRepository for PostgresDatabase {
     async fn create_user(&self, req: &CreateUserRequest) -> Result<Uuid, CreateUserError> {
         let result = query!(
             r#"
-            INSERT INTO users (id, email)
-            VALUES ($1, $2)
+            INSERT INTO users (id, email, password)
+            VALUES ($1, $2, $3)
             RETURNING id
             "#,
             req.id(),
             req.email().to_string(),
+            req.password_hash().to_string()
         )
         .fetch_one(&self.pool)
         .await
