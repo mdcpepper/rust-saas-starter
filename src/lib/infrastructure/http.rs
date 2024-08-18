@@ -1,17 +1,19 @@
 //! HTTP Server
 
 use std::{
-    net::{Ipv4Addr, SocketAddr},
+    net::{Ipv4Addr, SocketAddr, TcpListener},
     sync::Arc,
+    time::Duration,
 };
 
 use anyhow::Context;
 use axum::{extract::Request, Router};
+use axum_server::Handle;
 use chrono::Utc;
 use clap::Parser;
 use handlers::v1;
 use state::AppState;
-use tokio::{net::TcpListener, signal};
+use tokio::signal;
 use tower_http::trace::TraceLayer;
 use tracing::debug;
 
@@ -51,8 +53,7 @@ impl HttpServer {
         let router = router(state);
 
         let address = SocketAddr::from((Ipv4Addr::UNSPECIFIED, config.port));
-        let listener = TcpListener::bind(&address)
-            .await
+        let listener = TcpListener::bind(address)
             .with_context(|| format!("failed to listen on {}", config.port))?;
 
         Ok(Self { router, listener })
@@ -63,10 +64,14 @@ impl HttpServer {
     pub async fn run(self) -> anyhow::Result<()> {
         debug!("listening on {}", self.listener.local_addr().unwrap());
 
-        axum::serve(self.listener, self.router)
-            .with_graceful_shutdown(shutdown_signal())
-            .await
-            .context("failed to run server")?;
+        let handle = Handle::new();
+
+        shutdown_signal(Some(handle.clone())).await;
+
+        axum_server::from_tcp(self.listener)
+            .handle(handle)
+            .serve(self.router.into_make_service())
+            .await?;
 
         Ok(())
     }
@@ -86,7 +91,7 @@ pub fn router<US: UserManagement>(state: AppState<US>) -> Router {
 }
 
 #[mutants::skip]
-async fn shutdown_signal() {
+async fn shutdown_signal(handle: Option<Handle>) {
     let ctrl_c = async {
         signal::ctrl_c()
             .await
@@ -107,5 +112,10 @@ async fn shutdown_signal() {
     tokio::select! {
         _ = ctrl_c => {},
         _ = terminate => {},
+    }
+
+    if let Some(handle) = handle {
+        debug!("shutting down gracefully");
+        handle.graceful_shutdown(Some(Duration::from_secs(10)));
     }
 }
