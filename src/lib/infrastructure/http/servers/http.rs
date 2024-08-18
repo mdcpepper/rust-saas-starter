@@ -72,3 +72,32 @@ pub fn router(base_url: String) -> Router {
         .route("/*path", get(http_handler))
         .with_state(base_url)
 }
+
+#[cfg(test)]
+mod tests {
+    use anyhow::anyhow;
+    use axum::http::StatusCode;
+    use axum_test::TestServer;
+    use testresult::TestResult;
+
+    #[tokio::test]
+    async fn test_http_server_redirect() -> TestResult {
+        let base_url = "https://example.com".to_string();
+
+        let router = super::router(base_url.clone());
+
+        let response = TestServer::new(router)?.get("/abc/def").await;
+
+        response.assert_status(StatusCode::TEMPORARY_REDIRECT);
+
+        let location = response
+            .headers()
+            .get("location")
+            .ok_or_else(|| anyhow!("missing location header"))?
+            .to_str()?;
+
+        assert_eq!(location, format!("{}{}", base_url, "/abc/def"));
+
+        Ok(())
+    }
+}
