@@ -3,12 +3,18 @@
 use std::fmt;
 
 use axum::{
+    extract::rejection::JsonRejection,
     http::StatusCode,
     response::{IntoResponse, Response},
     Json,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+use crate::domain::auth::{
+    models::user::CreateUserError,
+    value_objects::{email_address::EmailAddressError, password::PasswordError},
+};
 
 /// An error response
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
@@ -88,6 +94,54 @@ impl From<anyhow::Error> for ApiError {
             status: StatusCode::INTERNAL_SERVER_ERROR,
             message: err.to_string(),
         }
+    }
+}
+
+impl From<EmailAddressError> for ApiError {
+    fn from(err: EmailAddressError) -> Self {
+        match err {
+            EmailAddressError::EmptyEmailAddress => {
+                ApiError::new_422("Please provide an email address")
+            }
+            EmailAddressError::InvalidEmailAddress => {
+                ApiError::new_422("Please provide a valid email address")
+            }
+        }
+    }
+}
+
+impl From<PasswordError> for ApiError {
+    fn from(err: PasswordError) -> Self {
+        match err {
+            PasswordError::TooShort => {
+                ApiError::new_422("Password must be at least 8 characters long")
+            }
+            PasswordError::TooLong => {
+                ApiError::new_422("Password must be at most 100 characters long")
+            }
+            PasswordError::TooWeak(suggestions) => {
+                ApiError::new_422(&format!("Password is too weak: {}", suggestions.join(" ")))
+            }
+        }
+    }
+}
+
+impl From<CreateUserError> for ApiError {
+    fn from(err: CreateUserError) -> Self {
+        match err {
+            CreateUserError::DuplicateUser { email } => {
+                ApiError::new_409(&format!("User with email \"{email}\" already exists"))
+            }
+            CreateUserError::UnknownError(_) => {
+                ApiError::new_500("An unknown error occurred, please try again")
+            }
+        }
+    }
+}
+
+impl From<JsonRejection> for ApiError {
+    fn from(rejection: JsonRejection) -> Self {
+        ApiError::new(rejection.status(), &rejection.body_text())
     }
 }
 

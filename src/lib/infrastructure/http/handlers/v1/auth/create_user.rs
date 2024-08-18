@@ -11,21 +11,9 @@ use uuid::Uuid;
 
 use crate::{
     domain::auth::{
-        models::user::{
-            CreateUserError::{self, DuplicateUser, UnknownError},
-            NewUser,
-        },
+        models::user::NewUser,
         services::user::UserManagement,
-        value_objects::{
-            email_address::{
-                EmailAddress,
-                EmailAddressError::{self, *},
-            },
-            password::{
-                Password,
-                PasswordError::{self, *},
-            },
-        },
+        value_objects::{email_address::EmailAddress, password::Password},
     },
     infrastructure::http::{errors::ApiError, state::AppState},
 };
@@ -48,8 +36,8 @@ impl TryFrom<CreateUserBody> for NewUser {
     fn try_from(body: CreateUserBody) -> Result<Self, Self::Error> {
         Ok(Self::new(
             Uuid::now_v7(),
-            EmailAddress::new(&body.email).map_err(map_email_error)?,
-            Password::new(&body.password).map_err(map_password_error)?,
+            EmailAddress::new(&body.email).map_err(ApiError::from)?,
+            Password::new(&body.password).map_err(ApiError::from)?,
         ))
     }
 }
@@ -80,7 +68,7 @@ pub async fn handler<US: UserManagement>(
     State(state): State<AppState<US>>,
     request: Result<Json<CreateUserBody>, JsonRejection>,
 ) -> Result<(StatusCode, Json<CreateUserResponse>), ApiError> {
-    let Json(request) = request.map_err(|e| ApiError::new(e.status(), &e.body_text()))?;
+    let Json(request) = request.map_err(ApiError::from)?;
 
     let email = request.email.clone();
 
@@ -88,35 +76,9 @@ pub async fn handler<US: UserManagement>(
         .users
         .create_user(&request.try_into()?)
         .await
-        .map_err(map_create_user_error)?;
+        .map_err(ApiError::from)?;
 
     Ok((StatusCode::CREATED, Json(CreateUserResponse { id, email })))
-}
-
-fn map_email_error(err: EmailAddressError) -> ApiError {
-    match err {
-        EmptyEmailAddress => ApiError::new_422("Please provide an email address"),
-        InvalidEmailAddress => ApiError::new_422("Please provide a valid email address"),
-    }
-}
-
-fn map_password_error(err: PasswordError) -> ApiError {
-    match err {
-        TooShort => ApiError::new_422("Password must be at least 8 characters long"),
-        TooLong => ApiError::new_422("Password must be at most 100 characters long"),
-        TooWeak(suggestions) => {
-            ApiError::new_422(&format!("Password is too weak: {}", suggestions.join(" ")))
-        }
-    }
-}
-
-fn map_create_user_error(err: CreateUserError) -> ApiError {
-    match err {
-        DuplicateUser { email } => {
-            ApiError::new_409(&format!("User with email \"{email}\" already exists"))
-        }
-        UnknownError(_) => ApiError::new_500("An unknown error occurred, please try again"),
-    }
 }
 
 #[cfg(test)]
