@@ -6,7 +6,10 @@ use rust_saas_starter::{
     domain::auth::services::user::UserService,
     infrastructure::{
         database::postgres::{DatabaseConnectionDetails, PostgresDatabase},
-        http::{HttpServer, HttpServerConfig, HttpsServer, Server},
+        http::{
+            servers::{http::HttpServer, https::HttpsServer},
+            HttpServerConfig, Server,
+        },
     },
 };
 
