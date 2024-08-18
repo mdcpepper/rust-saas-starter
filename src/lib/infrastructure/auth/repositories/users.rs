@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::{
     domain::auth::{
-        models::user::{CreateUserError, CreateUserRequest},
+        models::user::{CreateUserError, NewUser},
         repositories::user::UserRepository,
     },
     infrastructure::database::postgres::PostgresDatabase,
@@ -16,7 +16,7 @@ use crate::{
 #[async_trait]
 impl UserRepository for PostgresDatabase {
     #[mutants::skip]
-    async fn create_user(&self, req: &CreateUserRequest) -> Result<Uuid, CreateUserError> {
+    async fn create_user(&self, req: &NewUser) -> Result<Uuid, CreateUserError> {
         let result = query!(
             r#"
             INSERT INTO users (id, email, password)

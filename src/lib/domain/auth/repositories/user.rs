@@ -4,13 +4,13 @@ use async_trait::async_trait;
 use mockall::mock;
 use uuid::Uuid;
 
-use crate::domain::auth::models::user::{CreateUserError, CreateUserRequest};
+use crate::domain::auth::models::user::{CreateUserError, NewUser};
 
 /// User repository
 #[async_trait]
 pub trait UserRepository: Clone + Send + Sync + 'static {
     /// Create a new user
-    async fn create_user(&self, req: &CreateUserRequest) -> Result<Uuid, CreateUserError>;
+    async fn create_user(&self, req: &NewUser) -> Result<Uuid, CreateUserError>;
 }
 
 mock! {
@@ -22,6 +22,6 @@ mock! {
 
     #[async_trait]
     impl UserRepository for UserRepository {
-        async fn create_user(&self, req: &CreateUserRequest) -> Result<Uuid, CreateUserError>;
+        async fn create_user(&self, req: &NewUser) -> Result<Uuid, CreateUserError>;
     }
 }

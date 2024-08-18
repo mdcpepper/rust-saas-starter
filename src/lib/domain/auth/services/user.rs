@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::domain::auth::{
-    models::user::{CreateUserError, CreateUserRequest},
+    models::user::{CreateUserError, NewUser},
     repositories::user::UserRepository,
 };
 
@@ -21,7 +21,7 @@ pub trait UserManagement: Clone + Send + Sync + 'static {
     /// # Returns
     /// A [`Result`] which is [`Ok`] containing the user's UUID if the user is successfully created,
     /// or an [`Err`] containing a [`CreateUserError`] if the user cannot be created.
-    async fn create_user(&self, req: &CreateUserRequest) -> Result<Uuid, CreateUserError>;
+    async fn create_user(&self, req: &NewUser) -> Result<Uuid, CreateUserError>;
 }
 
 /// User service implementation
@@ -48,7 +48,7 @@ impl<R> UserManagement for UserService<R>
 where
     R: UserRepository,
 {
-    async fn create_user(&self, req: &CreateUserRequest) -> Result<Uuid, CreateUserError> {
+    async fn create_user(&self, req: &NewUser) -> Result<Uuid, CreateUserError> {
         self.repo.create_user(req).await
     }
 }
@@ -63,7 +63,7 @@ mod tests {
     use uuid::Uuid;
 
     use crate::domain::auth::{
-        models::user::{CreateUserError, CreateUserRequest},
+        models::user::{CreateUserError, NewUser},
         repositories::user::MockUserRepository,
         services::user::{UserManagement, UserService},
         value_objects::{email_address::EmailAddress, password::Password},
@@ -72,7 +72,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_user_success() -> TestResult {
         let user_id = Uuid::now_v7();
-        let request = CreateUserRequest::new(
+        let request = NewUser::new(
             user_id,
             EmailAddress::new("email@example.com")?,
             Password::new("correcthorsebatterystaple")?,
@@ -98,7 +98,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_user_already_exists() -> TestResult {
         let user_id = Uuid::now_v7();
-        let request = CreateUserRequest::new(
+        let request = NewUser::new(
             user_id,
             EmailAddress::new("email@example.com")?,
             Password::new("correcthorsebatterystaple")?,
@@ -129,7 +129,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_user_unknown_error() -> TestResult {
         let user_id = Uuid::now_v7();
-        let request = CreateUserRequest::new(
+        let request = NewUser::new(
             user_id,
             EmailAddress::new("email@example.com")?,
             Password::new("correcthorsebatterystaple")?,

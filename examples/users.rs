@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use rust_saas_starter::{
     domain::auth::{
-        models::user::CreateUserRequest,
+        models::user::NewUser,
         repositories::user::UserRepository,
         value_objects::{email_address::EmailAddress, password::Password},
     },
@@ -29,7 +29,7 @@ pub async fn main() -> Result<()> {
         .await
         .context("Failed to connect to the database")?;
 
-    let create_user = CreateUserRequest::new(
+    let create_user = NewUser::new(
         Uuid::now_v7(),
         EmailAddress::new("email@example.com")?,
         Password::new("password")?,

@@ -12,13 +12,19 @@ use uuid::Uuid;
 use crate::{
     domain::auth::{
         models::user::{
-            CreateUserError::{DuplicateUser, UnknownError},
-            CreateUserRequest,
+            CreateUserError::{self, DuplicateUser, UnknownError},
+            NewUser,
         },
         services::user::UserManagement,
         value_objects::{
-            email_address::{EmailAddress, EmailAddressError::*},
-            password::{Password, PasswordError::*},
+            email_address::{
+                EmailAddress,
+                EmailAddressError::{self, *},
+            },
+            password::{
+                Password,
+                PasswordError::{self, *},
+            },
         },
     },
     infrastructure::http::{errors::ApiError, state::AppState},
@@ -33,6 +39,18 @@ pub struct CreateUserBody {
     /// The new user's password
     #[schema(example = "correcthorsebatterystaple")]
     password: String,
+}
+
+impl TryFrom<CreateUserBody> for NewUser {
+    type Error = ApiError;
+
+    fn try_from(body: CreateUserBody) -> Result<Self, Self::Error> {
+        Ok(Self::new(
+            Uuid::now_v7(),
+            EmailAddress::new(&body.email).map_err(email_error)?,
+            Password::new(&body.password).map_err(password_error)?,
+        ))
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -63,37 +81,41 @@ pub async fn handler<US: UserManagement>(
 ) -> Result<(StatusCode, Json<CreateUserResponse>), ApiError> {
     let Json(request) = request.map_err(|e| ApiError::new(e.status(), &e.body_text()))?;
 
-    let email = EmailAddress::new(&request.email).map_err(|e| match e {
+    let email = request.email.clone();
+
+    let id = state
+        .users
+        .create_user(&request.try_into()?)
+        .await
+        .map_err(create_user_error)?;
+
+    Ok((StatusCode::CREATED, Json(CreateUserResponse { id, email })))
+}
+
+fn email_error(err: EmailAddressError) -> ApiError {
+    match err {
         EmptyEmailAddress => ApiError::new_422("Please provide an email address"),
         InvalidEmailAddress => ApiError::new_422("Please provide a valid email address"),
-    })?;
+    }
+}
 
-    let password = Password::new(&request.password).map_err(|e| match e {
+fn password_error(err: PasswordError) -> ApiError {
+    match err {
         TooShort => ApiError::new_422("Password must be at least 8 characters long"),
         TooLong => ApiError::new_422("Password must be at most 100 characters long"),
         TooWeak(suggestions) => {
             ApiError::new_422(&format!("Password is too weak: {}", suggestions.join(", ")))
         }
-    })?;
+    }
+}
 
-    let id = state
-        .users
-        .create_user(&CreateUserRequest::new(Uuid::now_v7(), email, password))
-        .await
-        .map_err(|e| match e {
-            DuplicateUser { email } => {
-                ApiError::new_409(&format!("User with email {} already exists", email))
-            }
-            UnknownError(_) => ApiError::new_500("An unknown error occurred, please try again"),
-        })?;
-
-    Ok((
-        StatusCode::CREATED,
-        Json(CreateUserResponse {
-            id,
-            email: request.email,
-        }),
-    ))
+fn create_user_error(err: CreateUserError) -> ApiError {
+    match err {
+        DuplicateUser { email } => {
+            ApiError::new_409(&format!("User with email {} already exists", email))
+        }
+        UnknownError(_) => ApiError::new_500("An unknown error occurred, please try again"),
+    }
 }
 
 #[cfg(test)]
