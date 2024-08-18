@@ -20,6 +20,7 @@ axum-test = "15.3.1"
 chrono = "0.4.38"
 clap = { version = "4.5.16", features = ["derive", "env"] }
 dotenvy = "0.15.7"
+http-serde = "2.1.1"
 lazy_static = "1.5.0"
 mockall = "0.13.0"
 mutants = "0.0.3"
@@ -43,5 +44,5 @@ tower-layer = "0.3.3"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["tracing"] }
 utoipa = { version = "4.2.3", features = ["axum_extras", "chrono", "uuid"] }
-uuid = { version = "1.10.0", features = ["v7"] }
+uuid = { version = "1.10.0", features = ["serde", "v7"] }
 zxcvbn = "3.1.0"

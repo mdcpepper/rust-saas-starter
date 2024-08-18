@@ -1,3 +1,5 @@
+//! Application state module
+
 use std::sync::Arc;
 
 use std::fmt;

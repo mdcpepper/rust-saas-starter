@@ -1,3 +1,13 @@
+#![warn(
+    missing_debug_implementations,
+    rust_2018_idioms,
+    missing_docs,
+    rustdoc::broken_intra_doc_links,
+    rustdoc::missing_crate_level_docs
+)]
+
+//! REST API for the application
+
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -13,11 +23,14 @@ use rust_saas_starter::{
     },
 };
 
-#[derive(Parser)]
+/// Command-line arguments / environment variables
+#[derive(Debug, Parser)]
 pub struct Args {
+    /// The HTTP server configuration
     #[clap(flatten)]
     pub server: HttpServerConfig,
 
+    /// The database connection details
     #[clap(flatten)]
     pub db: DatabaseConnectionDetails,
 }

@@ -1,4 +1,4 @@
-//! HTTP Server
+//! HTTP Server module
 
 use std::time::Duration;
 

@@ -1,3 +1,3 @@
-//! Authentication infrastructure module
+//! Authentication module
 
 pub mod repositories;

@@ -1,4 +1,4 @@
-//! The application's HTTP server.
+//! HTTP application server
 
 use std::net::{Ipv4Addr, SocketAddr, TcpListener};
 

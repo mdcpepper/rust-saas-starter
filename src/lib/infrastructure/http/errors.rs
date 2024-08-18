@@ -1,13 +1,20 @@
-//! Error handling for the API
+//! API error-handling module
 
-use anyhow::Error;
+use std::fmt;
+
 use axum::{
+    extract::rejection::JsonRejection,
     http::StatusCode,
     response::{IntoResponse, Response},
     Json,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+use crate::domain::auth::{
+    models::user::CreateUserError,
+    value_objects::{email_address::EmailAddressError, password::PasswordError},
+};
 
 /// An error response
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
@@ -18,13 +25,55 @@ pub struct ErrorResponse {
 }
 
 /// An error raised in the API
-#[derive(Debug)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ApiError {
     /// The status code
+    #[schema(example = 500, value_type = u16)]
+    #[serde(with = "http_serde::status_code")]
     pub status: StatusCode,
 
     /// The error message
+    #[schema(example = "Internal server error")]
     pub message: String,
+}
+
+impl ApiError {
+    /// Create a new API error
+    pub fn new(status: StatusCode, message: &str) -> Self {
+        Self {
+            status,
+            message: message.to_string(),
+        }
+    }
+
+    pub fn new_409(message: &str) -> Self {
+        Self {
+            status: StatusCode::CONFLICT,
+            message: message.to_string(),
+        }
+    }
+
+    /// Create a new unprocessable entity error
+    pub fn new_422(message: &str) -> Self {
+        Self {
+            status: StatusCode::UNPROCESSABLE_ENTITY,
+            message: message.to_string(),
+        }
+    }
+
+    /// Create new internal server error
+    pub fn new_500(message: &str) -> Self {
+        Self {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            message: message.to_string(),
+        }
+    }
+}
+
+impl fmt::Display for ApiError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.message)
+    }
 }
 
 impl IntoResponse for ApiError {
@@ -39,12 +88,60 @@ impl IntoResponse for ApiError {
     }
 }
 
-impl From<Error> for ApiError {
-    fn from(err: Error) -> Self {
+impl From<anyhow::Error> for ApiError {
+    fn from(err: anyhow::Error) -> Self {
         ApiError {
             status: StatusCode::INTERNAL_SERVER_ERROR,
             message: err.to_string(),
         }
+    }
+}
+
+impl From<EmailAddressError> for ApiError {
+    fn from(err: EmailAddressError) -> Self {
+        match err {
+            EmailAddressError::EmptyEmailAddress => {
+                ApiError::new_422("Please provide an email address")
+            }
+            EmailAddressError::InvalidEmailAddress => {
+                ApiError::new_422("Please provide a valid email address")
+            }
+        }
+    }
+}
+
+impl From<PasswordError> for ApiError {
+    fn from(err: PasswordError) -> Self {
+        match err {
+            PasswordError::TooShort => {
+                ApiError::new_422("Password must be at least 8 characters long")
+            }
+            PasswordError::TooLong => {
+                ApiError::new_422("Password must be at most 100 characters long")
+            }
+            PasswordError::TooWeak(suggestions) => {
+                ApiError::new_422(&format!("Password is too weak: {}", suggestions.join(" ")))
+            }
+        }
+    }
+}
+
+impl From<CreateUserError> for ApiError {
+    fn from(err: CreateUserError) -> Self {
+        match err {
+            CreateUserError::DuplicateUser { email } => {
+                ApiError::new_409(&format!("User with email \"{email}\" already exists"))
+            }
+            CreateUserError::UnknownError(_) => {
+                ApiError::new_500("An unknown error occurred, please try again")
+            }
+        }
+    }
+}
+
+impl From<JsonRejection> for ApiError {
+    fn from(rejection: JsonRejection) -> Self {
+        ApiError::new(rejection.status(), &rejection.body_text())
     }
 }
 

@@ -35,7 +35,7 @@ impl User {
 
 /// Create user request
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CreateUserRequest {
+pub struct NewUser {
     /// New user's ID
     id: Uuid,
 
@@ -46,7 +46,7 @@ pub struct CreateUserRequest {
     password_hash: String,
 }
 
-impl CreateUserRequest {
+impl NewUser {
     /// Create a new user request
     pub fn new(id: Uuid, email: EmailAddress, password: Password) -> Self {
         let password_hash = generate_hash(password.as_bytes());
@@ -96,11 +96,11 @@ mod tests {
 
     use crate::domain::auth::value_objects::{email_address::EmailAddress, password::Password};
 
-    use super::CreateUserRequest;
+    use super::NewUser;
 
     #[test]
     fn create_user_request_hashes_password() -> TestResult {
-        let create_user = CreateUserRequest::new(
+        let create_user = NewUser::new(
             Uuid::now_v7(),
             EmailAddress::new("email@example.com")?,
             Password::new("correcthorsebatterystaple")?,
