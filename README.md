@@ -49,4 +49,10 @@ sqlx migrate run
 cargo run --bin server
 ```
 
-The database can be viewed using Adminer at http://localhost:8888. Adminer is a lightweight database management tool that provides a web interface for interacting with the database.
+## Development Tools
+
+### Database Management
+
+The database can be viewed using Adminer, a lightweight database management tool that provides a web interface for interacting with the database.
+
+- Adminer URL: http://localhost:8888
