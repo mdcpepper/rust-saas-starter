@@ -22,6 +22,7 @@ pub struct UptimeResponse {
 #[utoipa::path(
     get,
     operation_id = "uptime",
+    tag = "System",
     path = "/api/v1/uptime",
     responses(
         (status = 200, description = "Uptime response", body = UptimeResponse),

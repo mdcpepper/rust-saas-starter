@@ -1,6 +1,5 @@
 //! Error handling for the API
 
-use anyhow::Error;
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
@@ -18,13 +17,49 @@ pub struct ErrorResponse {
 }
 
 /// An error raised in the API
-#[derive(Debug)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ApiError {
     /// The status code
+    #[schema(example = 500, value_type = u16)]
+    #[serde(with = "http_serde::status_code")]
     pub status: StatusCode,
 
     /// The error message
+    #[schema(example = "Internal server error")]
     pub message: String,
+}
+
+impl ApiError {
+    /// Create a new API error
+    pub fn new(status: StatusCode, message: &str) -> Self {
+        Self {
+            status,
+            message: message.to_string(),
+        }
+    }
+
+    pub fn new_409(message: &str) -> Self {
+        Self {
+            status: StatusCode::CONFLICT,
+            message: message.to_string(),
+        }
+    }
+
+    /// Create a new unprocessable entity error
+    pub fn new_422(message: &str) -> Self {
+        Self {
+            status: StatusCode::UNPROCESSABLE_ENTITY,
+            message: message.to_string(),
+        }
+    }
+
+    /// Create new internal server error
+    pub fn new_500(message: &str) -> Self {
+        Self {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            message: message.to_string(),
+        }
+    }
 }
 
 impl IntoResponse for ApiError {
@@ -39,8 +74,8 @@ impl IntoResponse for ApiError {
     }
 }
 
-impl From<Error> for ApiError {
-    fn from(err: Error) -> Self {
+impl From<anyhow::Error> for ApiError {
+    fn from(err: anyhow::Error) -> Self {
         ApiError {
             status: StatusCode::INTERNAL_SERVER_ERROR,
             message: err.to_string(),
