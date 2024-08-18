@@ -30,7 +30,8 @@ use crate::{
     infrastructure::http::{errors::ApiError, state::AppState},
 };
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+/// Create user request body
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateUserBody {
     /// The new user's email address
     #[schema(example = "email@example.com")]
@@ -47,12 +48,13 @@ impl TryFrom<CreateUserBody> for NewUser {
     fn try_from(body: CreateUserBody) -> Result<Self, Self::Error> {
         Ok(Self::new(
             Uuid::now_v7(),
-            EmailAddress::new(&body.email).map_err(email_error)?,
-            Password::new(&body.password).map_err(password_error)?,
+            EmailAddress::new(&body.email).map_err(map_email_error)?,
+            Password::new(&body.password).map_err(map_password_error)?,
         ))
     }
 }
 
+/// Create user response body
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateUserResponse {
     id: Uuid,
@@ -71,8 +73,7 @@ pub struct CreateUserResponse {
     responses(
         (status = StatusCode::CREATED, description = "User created", body = CreateUserResponse),
         (status = StatusCode::UNPROCESSABLE_ENTITY, description = "Unprocessable entity", body = ErrorResponse),
-        (status = StatusCode::CONFLICT, description = "User already exists", body = ErrorResponse, example = json!({"message": "User with email email@example.com aleady exists"})),
-
+        (status = StatusCode::CONFLICT, description = "User already exists", body = ErrorResponse, example = json!({"message": "User with email \"email@example.com\" aleady exists"})),
     )
 )]
 pub async fn handler<US: UserManagement>(
@@ -87,32 +88,32 @@ pub async fn handler<US: UserManagement>(
         .users
         .create_user(&request.try_into()?)
         .await
-        .map_err(create_user_error)?;
+        .map_err(map_create_user_error)?;
 
     Ok((StatusCode::CREATED, Json(CreateUserResponse { id, email })))
 }
 
-fn email_error(err: EmailAddressError) -> ApiError {
+fn map_email_error(err: EmailAddressError) -> ApiError {
     match err {
         EmptyEmailAddress => ApiError::new_422("Please provide an email address"),
         InvalidEmailAddress => ApiError::new_422("Please provide a valid email address"),
     }
 }
 
-fn password_error(err: PasswordError) -> ApiError {
+fn map_password_error(err: PasswordError) -> ApiError {
     match err {
         TooShort => ApiError::new_422("Password must be at least 8 characters long"),
         TooLong => ApiError::new_422("Password must be at most 100 characters long"),
         TooWeak(suggestions) => {
-            ApiError::new_422(&format!("Password is too weak: {}", suggestions.join(", ")))
+            ApiError::new_422(&format!("Password is too weak: {}", suggestions.join(" ")))
         }
     }
 }
 
-fn create_user_error(err: CreateUserError) -> ApiError {
+fn map_create_user_error(err: CreateUserError) -> ApiError {
     match err {
         DuplicateUser { email } => {
-            ApiError::new_409(&format!("User with email {} already exists", email))
+            ApiError::new_409(&format!("User with email \"{email}\" already exists"))
         }
         UnknownError(_) => ApiError::new_500("An unknown error occurred, please try again"),
     }
@@ -138,23 +139,34 @@ mod tests {
         },
     };
 
+    impl CreateUserBody {
+        /// Create a new `CreateUserBody` instance
+        fn new(email: &str, password: &str) -> Self {
+            Self {
+                email: email.to_string(),
+                password: password.to_string(),
+            }
+        }
+    }
+
     #[tokio::test]
     async fn test_create_user_success() -> TestResult {
         let mut user_repository = MockUserRepository::new();
         let user_id = Uuid::now_v7();
 
+        let email = EmailAddress::new("email@example.com")?;
+        let body = CreateUserBody::new(&email.to_string(), "correcthorsebatterystaple");
+
         user_repository
             .expect_create_user()
-            .returning(move |_req| Ok(user_id.clone()));
+            .withf(move |user| user.email() == &email)
+            .returning(move |_| Ok(user_id.clone()));
 
         let state: MockAppState = get_test_state(user_repository);
 
         let response = TestServer::new(router(state.clone()))?
             .post("/api/v1/users")
-            .json(&CreateUserBody {
-                email: "email@example.com".to_string(),
-                password: "correcthorsebatterystaple".to_string(),
-            })
+            .json(&body)
             .await;
 
         let json = response.json::<CreateUserResponse>();
@@ -171,10 +183,10 @@ mod tests {
 
         let response = TestServer::new(router(state.clone()))?
             .post("/api/v1/users")
-            .json(&CreateUserBody {
-                email: "not an email".to_string(),
-                password: "correcthorsebatterystaple".to_string(),
-            })
+            .json(&CreateUserBody::new(
+                "not an email",
+                "correcthorsebatterystaple",
+            ))
             .await;
 
         let json = response.json::<ErrorResponse>();
@@ -191,10 +203,7 @@ mod tests {
 
         let response = TestServer::new(router(state.clone()))?
             .post("/api/v1/users")
-            .json(&CreateUserBody {
-                email: "email@example.com".to_string(),
-                password: "short".to_string(),
-            })
+            .json(&CreateUserBody::new("email@example.com", "short"))
             .await;
 
         let json = response.json::<ErrorResponse>();
@@ -209,7 +218,7 @@ mod tests {
     async fn test_create_user_duplicate_user() -> TestResult {
         let mut user_repository = MockUserRepository::new();
 
-        user_repository.expect_create_user().returning(|_req| {
+        user_repository.expect_create_user().returning(|_| {
             Err(DuplicateUser {
                 email: EmailAddress::new("email@example.com").expect("valid email"),
             })
@@ -219,10 +228,10 @@ mod tests {
 
         let response = TestServer::new(router(state.clone()))?
             .post("/api/v1/users")
-            .json(&CreateUserBody {
-                email: "email@example.com".to_string(),
-                password: "correcthorsebatterystaple".to_string(),
-            })
+            .json(&CreateUserBody::new(
+                "email@example.com",
+                "correcthorsebatterystaple",
+            ))
             .await;
 
         let json = response.json::<ErrorResponse>();
@@ -230,7 +239,7 @@ mod tests {
         assert_eq!(response.status_code(), StatusCode::CONFLICT);
         assert_eq!(
             json.error,
-            "User with email email@example.com already exists"
+            "User with email \"email@example.com\" already exists"
         );
 
         Ok(())

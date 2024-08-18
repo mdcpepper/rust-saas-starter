@@ -1,4 +1,4 @@
-//! The application's HTTPS server
+//! HTTPS application server
 
 use std::{
     net::{Ipv4Addr, SocketAddr},

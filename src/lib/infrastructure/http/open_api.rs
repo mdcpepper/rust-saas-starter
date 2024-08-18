@@ -1,4 +1,4 @@
-//! OpenAPI 3.0.0 module
+//! OpenAPI module
 
 use utoipa::OpenApi;
 

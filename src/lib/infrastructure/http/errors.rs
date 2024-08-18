@@ -1,4 +1,6 @@
-//! Error handling for the API
+//! API error-handling module
+
+use std::fmt;
 
 use axum::{
     http::StatusCode,
@@ -59,6 +61,12 @@ impl ApiError {
             status: StatusCode::INTERNAL_SERVER_ERROR,
             message: message.to_string(),
         }
+    }
+}
+
+impl fmt::Display for ApiError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.message)
     }
 }
 

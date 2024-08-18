@@ -1,3 +1,5 @@
+//! Version 1 of the API
+
 use axum::{
     routing::{get, post},
     Json, Router,
@@ -13,6 +15,7 @@ pub mod auth;
 pub mod stoplight;
 pub mod uptime;
 
+/// Create the router for version 1 of the API
 pub fn router<US: UserManagement>() -> Router<AppState<US>> {
     Router::new()
         .route("/", get(stoplight::handler))
