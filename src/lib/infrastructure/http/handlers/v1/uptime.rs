@@ -45,7 +45,7 @@ mod tests {
         domain::auth::repositories::user::MockUserRepository,
         infrastructure::http::{
             handlers::v1::uptime::UptimeResponse,
-            router,
+            servers::https::router,
             state::{get_test_state, MockAppState},
         },
     };

@@ -1,11 +1,15 @@
 use std::sync::Arc;
 
+use anyhow::Result;
 use clap::Parser;
 use rust_saas_starter::{
     domain::auth::services::user::UserService,
     infrastructure::{
         database::postgres::{DatabaseConnectionDetails, PostgresDatabase},
-        http::{HttpServer, HttpServerConfig},
+        http::{
+            servers::{http::HttpServer, https::HttpsServer},
+            HttpServerConfig, Server,
+        },
     },
 };
 
@@ -20,7 +24,7 @@ pub struct Args {
 
 #[mutants::skip]
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> Result<()> {
     if let Err(e) = dotenvy::dotenv() {
         eprintln!("Failed to load environment: {}", e);
 
@@ -35,11 +39,15 @@ async fn main() -> anyhow::Result<()> {
 
     let user_service = UserService::new(postgres);
 
-    let http_config = HttpServerConfig {
-        port: args.server.port,
-    };
+    let http_config = args.server;
 
-    let http_server = HttpServer::new(user_service, http_config).await?;
+    let http_server = HttpServer::new(http_config.clone()).await?;
+    let https_server = HttpsServer::new(user_service.clone(), http_config).await?;
 
-    http_server.run().await
+    let http = tokio::spawn(http_server.run());
+    let https = tokio::spawn(https_server.run());
+
+    let _ = tokio::join!(http, https);
+
+    Ok(())
 }

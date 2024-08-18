@@ -31,7 +31,7 @@ mod tests {
     use crate::{
         domain::auth::repositories::user::MockUserRepository,
         infrastructure::http::{
-            router,
+            servers::https::router,
             state::{get_test_state, MockAppState},
         },
     };
