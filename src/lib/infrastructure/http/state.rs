@@ -18,6 +18,7 @@ pub struct AppState<US: UserService> {
     pub users: Arc<US>,
 }
 
+/// Implementation of the application state
 impl<US> AppState<US>
 where
     US: UserService,
