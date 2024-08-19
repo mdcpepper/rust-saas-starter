@@ -4,7 +4,9 @@ use chrono::{DateTime, Utc};
 use password_auth::generate_hash;
 use uuid::Uuid;
 
-use crate::domain::auth::value_objects::{email_address::EmailAddress, password::Password};
+use crate::domain::{
+    auth::value_objects::password::Password, comms::value_objects::email_address::EmailAddress,
+};
 
 /// User model
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -15,33 +17,14 @@ pub struct User {
     /// User email address
     pub email: EmailAddress,
 
+    /// Whether the user's email address has been confirmed
+    pub email_confirmed_at: Option<DateTime<Utc>>,
+
     /// User created at date in UTC
     pub created_at: DateTime<Utc>,
 
     /// User last updated at date in UTC
     pub updated_at: DateTime<Utc>,
-}
-
-impl User {
-    /// Get the user's id
-    pub fn id(&self) -> &Uuid {
-        &self.id
-    }
-
-    /// Get the user's email address
-    pub fn email(&self) -> &EmailAddress {
-        &self.email
-    }
-
-    /// Get the user's created at date
-    pub fn created_at(&self) -> &DateTime<Utc> {
-        &self.created_at
-    }
-
-    /// Get the user's updated at date
-    pub fn updated_at(&self) -> &DateTime<Utc> {
-        &self.updated_at
-    }
 }
 
 /// Create user request
@@ -55,6 +38,9 @@ pub struct NewUser {
 
     /// New user's password
     password_hash: String,
+
+    /// Whether email verification is required
+    email_verification_required: bool,
 }
 
 impl NewUser {
@@ -66,6 +52,7 @@ impl NewUser {
             id,
             email,
             password_hash,
+            email_verification_required: true,
         }
     }
 
@@ -90,7 +77,9 @@ mod tests {
     use testresult::TestResult;
     use uuid::Uuid;
 
-    use crate::domain::auth::value_objects::{email_address::EmailAddress, password::Password};
+    use crate::domain::{
+        auth::value_objects::password::Password, comms::value_objects::email_address::EmailAddress,
+    };
 
     use super::NewUser;
 

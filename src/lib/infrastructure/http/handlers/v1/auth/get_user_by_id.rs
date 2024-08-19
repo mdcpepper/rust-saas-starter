@@ -18,6 +18,7 @@ use crate::{
 pub struct GetUserByIdResponse {
     id: String,
     email: String,
+    email_confirmed_at: Option<DateTime<Utc>>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -25,10 +26,11 @@ pub struct GetUserByIdResponse {
 impl From<User> for GetUserByIdResponse {
     fn from(user: User) -> Self {
         Self {
-            id: user.id().to_string(),
-            email: user.email().to_string(),
-            created_at: *user.created_at(),
-            updated_at: *user.updated_at(),
+            id: user.id.to_string(),
+            email: user.email.to_string(),
+            email_confirmed_at: user.email_confirmed_at,
+            created_at: user.created_at,
+            updated_at: user.updated_at,
         }
     }
 }
@@ -66,9 +68,9 @@ mod tests {
     use uuid::Uuid;
 
     use crate::{
-        domain::auth::{
-            errors::GetUserByIdError, models::user::User, services::user::MockUserService,
-            value_objects::email_address::EmailAddress,
+        domain::{
+            auth::{errors::GetUserByIdError, models::user::User, services::user::MockUserService},
+            comms::value_objects::email_address::EmailAddress,
         },
         infrastructure::http::{
             errors::ErrorResponse, handlers::v1::auth::get_user_by_id::GetUserByIdResponse,
@@ -82,6 +84,7 @@ mod tests {
         let user = User {
             id: user_id.clone(),
             email: EmailAddress::new_unchecked("email@example.com"),
+            email_confirmed_at: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };

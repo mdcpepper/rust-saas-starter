@@ -11,9 +11,12 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::domain::auth::{
-    errors::{CreateUserError, GetUserByIdError},
-    value_objects::{email_address::EmailAddressError, password::PasswordError},
+use crate::domain::{
+    auth::{
+        errors::{CreateUserError, GetUserByIdError},
+        value_objects::password::PasswordError,
+    },
+    comms::value_objects::email_address::EmailAddressError,
 };
 
 /// An error response

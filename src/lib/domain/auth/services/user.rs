@@ -96,10 +96,12 @@ mod tests {
     use testresult::TestResult;
     use uuid::Uuid;
 
-    use crate::domain::auth::{
-        models::user::NewUser,
-        repositories::user::MockUserRepository,
-        value_objects::{email_address::EmailAddress, password::Password},
+    use crate::domain::{
+        auth::{
+            models::user::NewUser, repositories::user::MockUserRepository,
+            value_objects::password::Password,
+        },
+        comms::value_objects::email_address::EmailAddress,
     };
 
     use super::*;
@@ -109,7 +111,7 @@ mod tests {
         let user_id = Uuid::now_v7();
         let request = NewUser::new(
             user_id,
-            EmailAddress::new("email@example.com")?,
+            EmailAddress::new_unchecked("email@example.com"),
             Password::new("correcthorsebatterystaple")?,
         );
         let expected_id = request.id().clone();
@@ -135,7 +137,7 @@ mod tests {
         let user_id = Uuid::now_v7();
         let request = NewUser::new(
             user_id,
-            EmailAddress::new("email@example.com")?,
+            EmailAddress::new_unchecked("email@example.com"),
             Password::new("correcthorsebatterystaple")?,
         );
         let email = request.email().clone();
@@ -166,7 +168,7 @@ mod tests {
         let user_id = Uuid::now_v7();
         let request = NewUser::new(
             user_id,
-            EmailAddress::new("email@example.com")?,
+            EmailAddress::new_unchecked("email@example.com"),
             Password::new("correcthorsebatterystaple")?,
         );
 
@@ -194,6 +196,7 @@ mod tests {
         let user = User {
             id: user_id.clone(),
             email: EmailAddress::new_unchecked("mdcpepper@gmail.com"),
+            email_confirmed_at: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };

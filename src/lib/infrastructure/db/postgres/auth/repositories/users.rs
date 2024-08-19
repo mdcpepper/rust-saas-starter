@@ -11,11 +11,13 @@ use sqlx::{
 use uuid::Uuid;
 
 use crate::{
-    domain::auth::{
-        errors::{CreateUserError, GetUserByIdError},
-        models::user::{NewUser, User},
-        repositories::user::UserRepository,
-        value_objects::email_address::EmailAddress,
+    domain::{
+        auth::{
+            errors::{CreateUserError, GetUserByIdError},
+            models::user::{NewUser, User},
+            repositories::user::UserRepository,
+        },
+        comms::value_objects::email_address::EmailAddress,
     },
     infrastructure::db::postgres::PostgresDatabase,
 };
@@ -23,6 +25,7 @@ use crate::{
 struct UserRecord {
     id: Uuid,
     email: String,
+    email_confirmed_at: Option<DateTime<Utc>>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -34,6 +37,7 @@ impl TryFrom<UserRecord> for User {
         Ok(User {
             id: record.id,
             email: EmailAddress::new_unchecked(record.email.as_ref()),
+            email_confirmed_at: record.email_confirmed_at,
             created_at: record.created_at,
             updated_at: record.updated_at,
         })
@@ -74,7 +78,7 @@ impl UserRepository for PostgresDatabase {
         Ok(query_as!(
             UserRecord,
             r#"
-            SELECT id, email, created_at, updated_at
+            SELECT id, email, email_confirmed_at, created_at, updated_at
             FROM users
             WHERE id = $1
             "#,
