@@ -187,10 +187,17 @@ where
 
         let (token, expires_at) = self.generate_email_confirmation_token(user_id).await?;
 
-        let template = ConfirmEmailAddressTemplate::new(base_url, user_id, &token).render()?;
+        let template = ConfirmEmailAddressTemplate::new(base_url, user_id, &token);
+        let html = template.render()?;
+        let plain = template.render_plain()?;
 
         self.mailer
-            .send_email(&user.email, "Please confirm your email address", &template)
+            .send_email(
+                &user.email,
+                "Please confirm your email address",
+                &html,
+                &plain,
+            )
             .await?;
 
         Ok(expires_at)
@@ -443,7 +450,7 @@ mod tests {
         mailer
             .expect_send_email()
             .times(1)
-            .returning(move |_, _, _| Ok(()));
+            .returning(move |_, _, _, _| Ok(()));
 
         let service = UserServiceImpl::new(Arc::new(users), Arc::new(mailer));
 

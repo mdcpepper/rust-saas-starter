@@ -23,7 +23,8 @@ pub trait Mailer: Clone + Send + Sync + 'static {
         &self,
         to: &EmailAddress,
         subject: &str,
-        body: &str,
+        html: &str,
+        plain: &str,
     ) -> Result<(), EmailError>;
 }
 
@@ -37,6 +38,6 @@ mock! {
 
     #[async_trait]
     impl Mailer for Mailer {
-        async fn send_email(&self, to: &EmailAddress, subject: &str, body: &str) -> Result<(), EmailError>;
+        async fn send_email(&self, to: &EmailAddress, subject: &str, html: &str, plain: &str) -> Result<(), EmailError>;
     }
 }

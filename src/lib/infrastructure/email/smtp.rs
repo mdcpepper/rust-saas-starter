@@ -4,7 +4,7 @@ use anyhow::Result;
 use axum::async_trait;
 use clap::Parser;
 use lettre::{
-    message::header::ContentType,
+    message::MultiPart,
     transport::smtp::{
         authentication::Credentials,
         client::{Tls, TlsParameters},
@@ -78,14 +78,17 @@ impl Mailer for SMTPMailer {
         &self,
         to: &EmailAddress,
         subject: &str,
-        body: &str,
+        html: &str,
+        plain: &str,
     ) -> Result<(), EmailError> {
         let email = Message::builder()
             .from(self.config.sender.parse()?)
             .to(to.to_string().parse()?)
             .subject(subject.to_string())
-            .header(ContentType::TEXT_HTML)
-            .body(body.to_string())?;
+            .multipart(MultiPart::alternative_plain_html(
+                String::from(plain),
+                String::from(html),
+            ))?;
 
         match self.mailer()?.send(&email) {
             Ok(_) => Ok(()),

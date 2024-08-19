@@ -1,5 +1,6 @@
 //! Confirm email template
 
+use anyhow::Result;
 use askama::Template;
 use uuid::Uuid;
 
@@ -17,6 +18,14 @@ impl ConfirmEmailAddressTemplate {
         Self {
             link: format!("{base_url}/users/{user_id}/email/confirmation?token={token}"),
         }
+    }
+
+    /// Renders the plain text version of the email
+    pub fn render_plain(&self) -> Result<String> {
+        Ok(format!(
+            "Visit the following URL to confirm your email address: {link}",
+            link = self.link
+        ))
     }
 }
 
