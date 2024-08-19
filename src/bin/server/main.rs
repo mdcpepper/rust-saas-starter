@@ -8,16 +8,21 @@
 
 //! REST API for the application
 
-use std::sync::Arc;
+use std::{
+    net::{Ipv4Addr, Ipv6Addr, SocketAddr},
+    sync::Arc,
+};
 
 use anyhow::Result;
+use chrono::Utc;
 use clap::Parser;
 use rust_saas_starter::{
-    domain::auth::services::user::UserService,
+    domain::auth::services::user::{UserManagement, UserService},
     infrastructure::{
         database::postgres::{DatabaseConnectionDetails, PostgresDatabase},
         http::{
             servers::{http::HttpServer, https::HttpsServer},
+            state::AppState,
             HttpServerConfig, Server,
         },
     },
@@ -50,17 +55,67 @@ async fn main() -> Result<()> {
 
     let postgres = Arc::new(PostgresDatabase::new(&args.db.connection_string).await?);
 
-    let user_service = UserService::new(postgres);
+    let (ipv4_http_server, ipv6_http_server) =
+        get_http_servers(args.server.http_port, &args.server.base_url).await?;
 
-    let http_config = args.server;
+    let state = AppState {
+        start_time: Utc::now(),
+        users: Arc::new(UserService::new(postgres)),
+    };
 
-    let http_server = HttpServer::new(http_config.clone()).await?;
-    let https_server = HttpsServer::new(user_service.clone(), http_config).await?;
+    let (ipv4_https_server, ipv6_https_server) = get_https_servers(
+        args.server.https_port,
+        &args.server.cert_path,
+        &args.server.key_path,
+        state,
+    )
+    .await?;
 
-    let http = tokio::spawn(http_server.run());
-    let https = tokio::spawn(https_server.run());
-
-    let _ = tokio::join!(http, https);
+    let _ = tokio::join!(
+        tokio::spawn(ipv4_http_server.run()),
+        tokio::spawn(ipv6_http_server.run()),
+        tokio::spawn(ipv4_https_server.run()),
+        tokio::spawn(ipv6_https_server.run()),
+    );
 
     Ok(())
+}
+
+async fn get_http_servers(http_port: u16, base_url: &str) -> Result<(HttpServer, HttpServer)> {
+    Ok((
+        HttpServer::new(
+            SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), http_port),
+            base_url,
+        )
+        .await?,
+        HttpServer::new(
+            SocketAddr::new(Ipv6Addr::UNSPECIFIED.into(), http_port),
+            base_url,
+        )
+        .await?,
+    ))
+}
+
+async fn get_https_servers(
+    port: u16,
+    cert_path: &str,
+    key_path: &str,
+    state: AppState<impl UserManagement>,
+) -> Result<(HttpsServer, HttpsServer)> {
+    Ok((
+        HttpsServer::new(
+            SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), port),
+            cert_path,
+            key_path,
+            state.clone(),
+        )
+        .await?,
+        HttpsServer::new(
+            SocketAddr::new(Ipv6Addr::UNSPECIFIED.into(), port),
+            cert_path,
+            key_path,
+            state,
+        )
+        .await?,
+    ))
 }

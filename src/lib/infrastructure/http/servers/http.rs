@@ -1,13 +1,13 @@
 //! HTTP application server
 
-use std::net::{Ipv4Addr, SocketAddr, TcpListener};
+use std::net::{SocketAddr, TcpListener};
 
 use anyhow::{Context, Result};
 use axum::{async_trait, extract::State, http::Uri, response::Redirect, routing::get, Router};
 use axum_server::Handle;
 use tracing::{debug, info};
 
-use crate::infrastructure::http::{shutdown_signal, HttpServerConfig, Server};
+use crate::infrastructure::http::{shutdown_signal, Server};
 
 /// The application's HTTP server
 #[derive(Debug)]
@@ -18,12 +18,11 @@ pub struct HttpServer {
 
 impl HttpServer {
     /// Returns a new HTTP server bound to the port specified in `config`.
-    pub async fn new(config: HttpServerConfig) -> Result<Self> {
-        let router = router(config.base_url);
+    pub async fn new(address: SocketAddr, base_url: &str) -> Result<Self> {
+        let router = router(base_url);
 
-        let address = SocketAddr::from((Ipv4Addr::UNSPECIFIED, config.http_port));
         let listener = TcpListener::bind(address)
-            .with_context(|| format!("failed to listen on {}", config.http_port))?;
+            .with_context(|| format!("failed to listen on {}", address))?;
 
         Ok(Self { router, listener })
     }
@@ -67,10 +66,10 @@ async fn http_handler(State(base_url): State<String>, uri: Uri) -> Redirect {
 }
 
 /// Create the router for the HTTP server
-pub fn router(base_url: String) -> Router {
+pub fn router(base_url: &str) -> Router {
     Router::new()
         .route("/*path", get(http_handler))
-        .with_state(base_url)
+        .with_state(base_url.to_string())
 }
 
 #[cfg(test)]
@@ -82,9 +81,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_http_server_redirect() -> TestResult {
-        let base_url = "https://example.com".to_string();
+        let base_url = "https://example.com";
 
-        let router = super::router(base_url.clone());
+        let router = super::router(base_url);
 
         let response = TestServer::new(router)?.get("/abc/def").await;
 
