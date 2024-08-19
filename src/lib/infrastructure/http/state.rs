@@ -10,21 +10,21 @@ use crate::domain::auth::services::user::UserService;
 
 /// Global application state
 #[derive(Clone)]
-pub struct AppState<US: UserService> {
+pub struct AppState<U: UserService> {
     /// The time the server started
     pub start_time: DateTime<Utc>,
 
     /// User service
-    pub users: Arc<US>,
+    pub users: Arc<U>,
 }
 
 /// Implementation of the application state
-impl<US> AppState<US>
+impl<U> AppState<U>
 where
-    US: UserService,
+    U: UserService,
 {
     /// Create a new application state
-    pub fn new(users: US) -> Self {
+    pub fn new(users: U) -> Self {
         Self {
             start_time: Utc::now(),
             users: Arc::new(users),
@@ -32,9 +32,9 @@ where
     }
 }
 
-impl<US> fmt::Debug for AppState<US>
+impl<U> fmt::Debug for AppState<U>
 where
-    US: UserService,
+    U: UserService,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("AppState")

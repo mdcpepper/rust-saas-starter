@@ -3,7 +3,7 @@
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::domain::comms::value_objects::email_address::EmailAddress;
+use crate::domain::comms::{errors::EmailError, value_objects::email_address::EmailAddress};
 
 /// Errors that can occur when creating a user
 #[derive(Debug, Error)]
@@ -30,4 +30,50 @@ pub enum GetUserByIdError {
     /// Unknown error
     #[error(transparent)]
     UnknownError(#[from] anyhow::Error),
+}
+
+/// Errors that can occur when sending or verifying an email confirmation
+#[derive(Debug, Error)]
+pub enum EmailConfirmationError {
+    /// User not found
+    #[error("user with id \"{0}\" not found")]
+    UserNotFound(Uuid),
+
+    /// Could not send confirmation email
+    #[error("could not send confirmation email")]
+    CouldNotSendEmail,
+
+    /// Email is already confirmed
+    #[error("email is already confirmed")]
+    EmailAlreadyConfirmed,
+
+    /// Confirmation token expired
+    #[error("confirmation token expired")]
+    ConfirmationTokenExpired,
+
+    /// Confirmation token mismatch
+    #[error("confirmation token mismatch")]
+    ConfirmationTokenMismatch,
+
+    /// Unknown error
+    #[error(transparent)]
+    UnknownError(anyhow::Error),
+}
+
+impl From<GetUserByIdError> for EmailConfirmationError {
+    fn from(err: GetUserByIdError) -> Self {
+        match err {
+            GetUserByIdError::UserNotFound(id) => EmailConfirmationError::UserNotFound(id),
+            GetUserByIdError::UnknownError(e) => EmailConfirmationError::UnknownError(e),
+        }
+    }
+}
+
+impl From<EmailError> for EmailConfirmationError {
+    fn from(err: EmailError) -> Self {
+        match err {
+            EmailError::SendError => EmailConfirmationError::CouldNotSendEmail,
+            EmailError::UnknownError(e) => EmailConfirmationError::UnknownError(e),
+        }
+    }
 }

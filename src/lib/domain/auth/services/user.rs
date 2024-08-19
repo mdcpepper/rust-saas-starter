@@ -1,4 +1,4 @@
-//! User service module.
+//! User service module
 
 use std::sync::Arc;
 
@@ -8,10 +8,13 @@ use uuid::Uuid;
 #[cfg(test)]
 use mockall::mock;
 
-use crate::domain::auth::{
-    errors::{CreateUserError, GetUserByIdError},
-    models::user::{NewUser, User},
-    repositories::user::UserRepository,
+use crate::domain::{
+    auth::{
+        errors::{CreateUserError, EmailConfirmationError, GetUserByIdError},
+        models::user::{NewUser, User},
+        repositories::user::UserRepository,
+    },
+    comms::mailer::Mailer,
 };
 
 /// User service
@@ -36,6 +39,16 @@ pub trait UserService: Clone + Send + Sync + 'static {
     /// A [`Result`] which is [`Ok`] containing the [`User`] if found,
     /// or an [`Err`] containing a [`GetUserError`] if the user cannot be found.
     async fn get_user_by_id(&self, id: &Uuid) -> Result<User, GetUserByIdError>;
+
+    /// Sends an email confirmation to the user.
+    ///
+    /// # Arguments
+    /// * `id` - The UUID of the user to send the email confirmation to.
+    ///
+    /// # Returns
+    /// A [`Result`] which is [`Ok`] if the email confirmation was sent successfully,
+    /// or an [`Err`] containing an [`EmailConfirmationError`] if the email confirmation could not be sent.
+    async fn send_email_confirmation(&self, id: &Uuid) -> Result<(), EmailConfirmationError>;
 }
 
 #[cfg(test)]
@@ -50,32 +63,37 @@ mock! {
     impl UserService for UserService {
         async fn create_user(&self, req: &NewUser) -> Result<Uuid, CreateUserError>;
         async fn get_user_by_id(&self, id: &Uuid) -> Result<User, GetUserByIdError>;
+        async fn send_email_confirmation(&self, id: &Uuid) -> Result<(), EmailConfirmationError>;
     }
 }
 
 /// User service implementation
 #[derive(Debug, Clone)]
-pub struct UserServiceImpl<R>
+pub struct UserServiceImpl<R, M>
 where
     R: UserRepository,
+    M: Mailer,
 {
     repo: Arc<R>,
+    mailer: Arc<M>,
 }
 
-impl<R> UserServiceImpl<R>
+impl<R, M> UserServiceImpl<R, M>
 where
     R: UserRepository,
+    M: Mailer,
 {
     /// Create a new user service
-    pub fn new(repo: Arc<R>) -> Self {
-        Self { repo }
+    pub fn new(repo: Arc<R>, mailer: Arc<M>) -> Self {
+        Self { repo, mailer }
     }
 }
 
 #[async_trait]
-impl<R> UserService for UserServiceImpl<R>
+impl<R, M> UserService for UserServiceImpl<R, M>
 where
     R: UserRepository,
+    M: Mailer,
 {
     async fn create_user(&self, req: &NewUser) -> Result<Uuid, CreateUserError> {
         self.repo.create_user(req).await
@@ -83,6 +101,22 @@ where
 
     async fn get_user_by_id(&self, id: &Uuid) -> Result<User, GetUserByIdError> {
         self.repo.get_user_by_id(id).await
+    }
+
+    async fn send_email_confirmation(&self, id: &Uuid) -> Result<(), EmailConfirmationError> {
+        let user = self.get_user_by_id(id).await?;
+
+        if user.email_confirmed_at.is_some() {
+            return Err(EmailConfirmationError::EmailAlreadyConfirmed);
+        }
+
+        // TODO: generate token
+
+        self.mailer
+            .send_email(&user.email, "Confirm email", "[link]")
+            .await?;
+
+        Ok(())
     }
 }
 
@@ -101,7 +135,7 @@ mod tests {
             models::user::NewUser, repositories::user::MockUserRepository,
             value_objects::password::Password,
         },
-        comms::value_objects::email_address::EmailAddress,
+        comms::{mailer::MockMailer, value_objects::email_address::EmailAddress},
     };
 
     use super::*;
@@ -123,7 +157,7 @@ mod tests {
             .with(eq(request.clone()))
             .returning(move |_| Ok(expected_id));
 
-        let service = UserServiceImpl::new(Arc::new(mock));
+        let service = UserServiceImpl::new(Arc::new(mock), Arc::new(MockMailer::new()));
 
         let user_id = service.create_user(&request).await?;
 
@@ -153,7 +187,7 @@ mod tests {
                 })
             });
 
-        let service = UserServiceImpl::new(Arc::new(mock));
+        let service = UserServiceImpl::new(Arc::new(mock), Arc::new(MockMailer::new()));
 
         let result = service.create_user(&request).await;
 
@@ -179,7 +213,7 @@ mod tests {
             .with(eq(request.clone()))
             .returning(move |_req| Err(CreateUserError::UnknownError(anyhow!("Unknown error"))));
 
-        let service = UserServiceImpl::new(Arc::new(mock));
+        let service = UserServiceImpl::new(Arc::new(mock), Arc::new(MockMailer::new()));
 
         let result = service.create_user(&request).await;
 
@@ -203,14 +237,14 @@ mod tests {
 
         let expected_user = user.clone();
 
-        let mut mock = MockUserRepository::new();
+        let mut repo = MockUserRepository::new();
 
-        mock.expect_get_user_by_id()
+        repo.expect_get_user_by_id()
             .times(1)
             .with(eq(user_id.clone()))
             .returning(move |_| Ok(user.clone()));
 
-        let service = UserServiceImpl::new(Arc::new(mock));
+        let service = UserServiceImpl::new(Arc::new(repo), Arc::new(MockMailer::new()));
 
         let found_user = service.get_user_by_id(&user_id).await?;
 
@@ -230,7 +264,7 @@ mod tests {
             .with(eq(user_id.clone()))
             .returning(move |_| Err(GetUserByIdError::UserNotFound(user_id.clone())));
 
-        let service = UserServiceImpl::new(Arc::new(mock));
+        let service = UserServiceImpl::new(Arc::new(mock), Arc::new(MockMailer::new()));
 
         let result = service.get_user_by_id(&user_id).await;
 

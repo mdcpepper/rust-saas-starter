@@ -20,6 +20,7 @@ use rust_saas_starter::{
     domain::auth::services::user::UserServiceImpl,
     infrastructure::{
         db::postgres::{DatabaseConnectionDetails, PostgresDatabase},
+        email::smtp::SMTPMailer,
         http::{
             servers::{http::HttpServer, https::HttpsServer},
             state::AppState,
@@ -54,10 +55,11 @@ async fn main() -> Result<()> {
     let args = Args::parse();
 
     let postgres = Arc::new(PostgresDatabase::new(&args.db.connection_string).await?);
+    let mailer = Arc::new(SMTPMailer::new());
 
     let state = AppState {
         start_time: Utc::now(),
-        users: Arc::new(UserServiceImpl::new(postgres)),
+        users: Arc::new(UserServiceImpl::new(postgres, mailer)),
     };
 
     let http_port = args.server.http_port;

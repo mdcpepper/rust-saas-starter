@@ -28,8 +28,8 @@ pub struct UptimeResponse {
         (status = 200, description = "Uptime response", body = UptimeResponse),
     )
 )]
-pub async fn handler<US: UserService>(
-    State(state): State<AppState<US>>,
+pub async fn handler<U: UserService>(
+    State(state): State<AppState<U>>,
 ) -> Result<Json<UptimeResponse>, ApiError> {
     let uptime = Utc::now().timestamp() - state.start_time.timestamp();
 
