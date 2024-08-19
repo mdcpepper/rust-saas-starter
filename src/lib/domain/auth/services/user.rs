@@ -7,6 +7,7 @@ use askama::Template;
 use async_trait::async_trait;
 use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 use chrono::{DateTime, Duration, Utc};
+use constant_time_eq::constant_time_eq;
 use rand::{distributions::Alphanumeric, Rng};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
@@ -206,7 +207,7 @@ where
             return Err(EmailConfirmationError::ConfirmationTokenExpired);
         }
 
-        if token != *expected_token {
+        if !constant_time_eq(token.as_bytes(), expected_token.as_bytes()) {
             return Err(EmailConfirmationError::ConfirmationTokenMismatch);
         }
 

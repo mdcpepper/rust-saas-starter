@@ -21,6 +21,7 @@ axum-test = "15.3.1"
 base64 = "0.22.1"
 chrono = { version = "0.4.38", features = ["serde"] }
 clap = { version = "4.5.16", features = ["derive", "env"] }
+constant_time_eq = "0.3.0"
 dotenvy = "0.15.7"
 http-serde = "2.1.1"
 lazy_static = "1.5.0"
