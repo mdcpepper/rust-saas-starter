@@ -56,16 +56,14 @@ impl UserRepository for PostgresDatabase {
         )
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| match e {
-            Database(db_error) => match db_error.kind() {
+        .map_err(|err| match err {
+            Database(db_err) => match db_err.kind() {
                 UniqueViolation => CreateUserError::DuplicateUser {
                     email: req.email().clone(),
                 },
-                _ => {
-                    CreateUserError::UnknownError(anyhow!("Unknown database error: {:?}", db_error))
-                }
+                _ => CreateUserError::UnknownError(anyhow!("Unknown database error: {:?}", db_err)),
             },
-            _ => CreateUserError::UnknownError(anyhow!("Unknown database error: {:?}", e)),
+            _ => CreateUserError::UnknownError(anyhow!("Unknown database error: {:?}", err)),
         })?;
 
         Ok(result.id)
@@ -73,8 +71,6 @@ impl UserRepository for PostgresDatabase {
 
     #[mutants::skip]
     async fn get_user_by_id(&self, id: &Uuid) -> Result<User, GetUserByIdError> {
-        println!("========================== {id}");
-
         Ok(query_as!(
             UserRecord,
             r#"
@@ -86,9 +82,9 @@ impl UserRepository for PostgresDatabase {
         )
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| match e {
+        .map_err(|err| match err {
             RowNotFound => GetUserByIdError::UserNotFound(*id),
-            _ => GetUserByIdError::UnknownError(anyhow!("Unknown database error: {:?}", e)),
+            _ => GetUserByIdError::UnknownError(anyhow!("Unknown database error: {:?}", err)),
         })?
         .try_into()?)
     }
