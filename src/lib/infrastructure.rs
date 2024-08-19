@@ -1,5 +1,4 @@
 //! Infrastructure module
 
-pub mod auth;
-pub mod database;
+pub mod db;
 pub mod http;

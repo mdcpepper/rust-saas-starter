@@ -19,7 +19,7 @@ use clap::Parser;
 use rust_saas_starter::{
     domain::auth::services::user::UserService,
     infrastructure::{
-        database::postgres::{DatabaseConnectionDetails, PostgresDatabase},
+        db::postgres::{DatabaseConnectionDetails, PostgresDatabase},
         http::{
             servers::{http::HttpServer, https::HttpsServer},
             state::AppState,

@@ -5,6 +5,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
+#[cfg(test)]
+use mockall::mock;
+
 use crate::domain::auth::{
     models::user::{CreateUserError, NewUser},
     repositories::user::UserRepository,
@@ -12,7 +15,7 @@ use crate::domain::auth::{
 
 /// User service
 #[async_trait]
-pub trait UserManagement: Clone + Send + Sync + 'static {
+pub trait UserServiceImpl: Clone + Send + Sync + 'static {
     /// Creates a new user based on the provided request details.
     ///
     /// # Arguments
@@ -22,6 +25,20 @@ pub trait UserManagement: Clone + Send + Sync + 'static {
     /// A [`Result`] which is [`Ok`] containing the user's UUID if the user is successfully created,
     /// or an [`Err`] containing a [`CreateUserError`] if the user cannot be created.
     async fn create_user(&self, req: &NewUser) -> Result<Uuid, CreateUserError>;
+}
+
+#[cfg(test)]
+mock! {
+    pub UserServiceImpl {}
+
+    impl Clone for UserServiceImpl {
+        fn clone(&self) -> Self;
+    }
+
+    #[async_trait]
+    impl UserServiceImpl for UserServiceImpl {
+        async fn create_user(&self, req: &NewUser) -> Result<Uuid, CreateUserError>;
+    }
 }
 
 /// User service implementation
@@ -44,7 +61,7 @@ where
 }
 
 #[async_trait]
-impl<R> UserManagement for UserService<R>
+impl<R> UserServiceImpl for UserService<R>
 where
     R: UserRepository,
 {
@@ -65,7 +82,7 @@ mod tests {
     use crate::domain::auth::{
         models::user::{CreateUserError, NewUser},
         repositories::user::MockUserRepository,
-        services::user::{UserManagement, UserService},
+        services::user::{UserService, UserServiceImpl},
         value_objects::{email_address::EmailAddress, password::Password},
     };
 

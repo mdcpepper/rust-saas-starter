@@ -12,7 +12,7 @@ use uuid::Uuid;
 use crate::{
     domain::auth::{
         models::user::NewUser,
-        services::user::UserManagement,
+        services::user::UserServiceImpl,
         value_objects::{email_address::EmailAddress, password::Password},
     },
     infrastructure::http::{errors::ApiError, state::AppState},
@@ -64,7 +64,7 @@ pub struct CreateUserResponse {
         (status = StatusCode::CONFLICT, description = "User already exists", body = ErrorResponse, example = json!({"message": "User with email \"email@example.com\" aleady exists"})),
     )
 )]
-pub async fn handler<US: UserManagement>(
+pub async fn handler<US: UserServiceImpl>(
     State(state): State<AppState<US>>,
     request: Result<Json<CreateUserBody>, JsonRejection>,
 ) -> Result<(StatusCode, Json<CreateUserResponse>), ApiError> {
@@ -90,14 +90,14 @@ mod tests {
 
     use crate::{
         domain::auth::{
-            models::user::CreateUserError::DuplicateUser, repositories::user::MockUserRepository,
+            models::user::CreateUserError::DuplicateUser, services::user::MockUserServiceImpl,
             value_objects::email_address::EmailAddress,
         },
         infrastructure::http::{
             errors::ErrorResponse,
             handlers::v1::auth::create_user::{CreateUserBody, CreateUserResponse},
             servers::https::router,
-            state::{get_test_state, MockAppState},
+            state::AppState,
         },
     };
 
@@ -113,20 +113,20 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_user_success() -> TestResult {
-        let mut user_repository = MockUserRepository::new();
+        let mut user_service = MockUserServiceImpl::new();
         let user_id = Uuid::now_v7();
 
         let email = EmailAddress::new("email@example.com")?;
         let body = CreateUserBody::new(&email.to_string(), "correcthorsebatterystaple");
 
-        user_repository
+        user_service
             .expect_create_user()
             .withf(move |user| user.email() == &email)
             .returning(move |_| Ok(user_id.clone()));
 
-        let state: MockAppState = get_test_state(user_repository);
+        let state = AppState::new(user_service);
 
-        let response = TestServer::new(router(state.clone()))?
+        let response = TestServer::new(router(state))?
             .post("/api/v1/users")
             .json(&body)
             .await;
@@ -141,9 +141,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_user_email_error() -> TestResult {
-        let state: MockAppState = get_test_state(MockUserRepository::new());
+        let state = AppState::new(MockUserServiceImpl::new());
 
-        let response = TestServer::new(router(state.clone()))?
+        let response = TestServer::new(router(state))?
             .post("/api/v1/users")
             .json(&CreateUserBody::new(
                 "not an email",
@@ -161,9 +161,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_user_password_error() -> TestResult {
-        let state: MockAppState = get_test_state(MockUserRepository::new());
+        let state = AppState::new(MockUserServiceImpl::new());
 
-        let response = TestServer::new(router(state.clone()))?
+        let response = TestServer::new(router(state))?
             .post("/api/v1/users")
             .json(&CreateUserBody::new("email@example.com", "short"))
             .await;
@@ -178,17 +178,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_user_duplicate_user() -> TestResult {
-        let mut user_repository = MockUserRepository::new();
+        let mut user_service = MockUserServiceImpl::new();
 
-        user_repository.expect_create_user().returning(|_| {
+        user_service.expect_create_user().returning(|_| {
             Err(DuplicateUser {
                 email: EmailAddress::new("email@example.com").expect("valid email"),
             })
         });
 
-        let state: MockAppState = get_test_state(user_repository);
+        let state = AppState::new(user_service);
 
-        let response = TestServer::new(router(state.clone()))?
+        let response = TestServer::new(router(state))?
             .post("/api/v1/users")
             .json(&CreateUserBody::new(
                 "email@example.com",

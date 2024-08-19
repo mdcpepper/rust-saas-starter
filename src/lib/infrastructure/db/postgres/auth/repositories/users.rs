@@ -10,7 +10,7 @@ use crate::{
         models::user::{CreateUserError, NewUser},
         repositories::user::UserRepository,
     },
-    infrastructure::database::postgres::PostgresDatabase,
+    infrastructure::db::postgres::PostgresDatabase,
 };
 
 #[async_trait]
