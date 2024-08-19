@@ -16,10 +16,11 @@ pub mod stoplight;
 pub mod uptime;
 
 /// Create the router for version 1 of the API
-pub fn router<US: UserService>() -> Router<AppState<US>> {
+pub fn router<U: UserService>() -> Router<AppState<U>> {
     Router::new()
         .route("/", get(stoplight::handler))
         .route("/openapi.json", get(Json(ApiDocs::openapi())))
         .route("/uptime", get(uptime::handler))
+        .route("/users/:id", get(auth::get_user_by_id::handler))
         .route("/users", post(auth::create_user::handler))
 }

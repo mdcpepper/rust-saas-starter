@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::domain::auth::{
-    models::user::CreateUserError,
+    errors::{CreateUserError, GetUserByIdError},
     value_objects::{email_address::EmailAddressError, password::PasswordError},
 };
 
@@ -42,6 +42,13 @@ impl ApiError {
     pub fn new(status: StatusCode, message: &str) -> Self {
         Self {
             status,
+            message: message.to_string(),
+        }
+    }
+
+    pub fn new_404(message: &str) -> Self {
+        Self {
+            status: StatusCode::NOT_FOUND,
             message: message.to_string(),
         }
     }
@@ -133,6 +140,19 @@ impl From<CreateUserError> for ApiError {
                 ApiError::new_409(&format!("User with email \"{email}\" already exists"))
             }
             CreateUserError::UnknownError(_) => {
+                ApiError::new_500("An unknown error occurred, please try again")
+            }
+        }
+    }
+}
+
+impl From<GetUserByIdError> for ApiError {
+    fn from(err: GetUserByIdError) -> Self {
+        match err {
+            GetUserByIdError::UserNotFound(id) => {
+                ApiError::new_404(&format!("User with id \"{id}\" not found"))
+            }
+            GetUserByIdError::UnknownError(_) => {
                 ApiError::new_500("An unknown error occurred, please try again")
             }
         }
