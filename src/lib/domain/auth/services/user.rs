@@ -53,8 +53,8 @@ pub trait UserService: Clone + Send + Sync + 'static {
     /// * `id` - The UUID of the user to send the email confirmation to.
     ///
     /// # Returns
-    /// A [`Result`] which is [`Ok`] if the email confirmation was sent successfully,
-    /// or an [`Err`] containing an [`EmailConfirmationError`] if the email confirmation could not be sent.
+    /// - [`Ok`] with a [`DateTime<Utc>`] representing the token's expiration time if successful.
+    /// - [`Err`] containing an [`EmailConfirmationError`] if the email confirmation could not be sent.
     async fn send_email_confirmation(
         &self,
         user_id: &Uuid,
@@ -126,7 +126,7 @@ where
     ) -> Result<(String, DateTime<Utc>)> {
         let salt: String = rand::thread_rng()
             .sample_iter(&Alphanumeric)
-            .take(16)
+            .take(64)
             .map(char::from)
             .collect();
 
@@ -195,6 +195,16 @@ where
             .email_confirmation_token
             .as_ref()
             .ok_or_else(|| EmailConfirmationError::ConfirmationTokenMismatch)?;
+
+        let confirmation_sent_at = user
+            .email_confirmation_sent_at
+            .ok_or_else(|| EmailConfirmationError::ConfirmationTokenMismatch)?;
+
+        let expires_at = confirmation_sent_at + Duration::hours(24);
+
+        if Utc::now() > expires_at {
+            return Err(EmailConfirmationError::ConfirmationTokenExpired);
+        }
 
         if token != *expected_token {
             return Err(EmailConfirmationError::ConfirmationTokenMismatch);
@@ -471,7 +481,7 @@ mod tests {
                     email: EmailAddress::new_unchecked("email@example.com"),
                     email_confirmed_at: None,
                     email_confirmation_token: Some("token".to_string()),
-                    email_confirmation_sent_at: Some(yesterday.clone()),
+                    email_confirmation_sent_at: Some(yesterday.clone() + Duration::hours(12)),
                     created_at: yesterday.clone(),
                     updated_at: yesterday.clone(),
                 })
@@ -493,7 +503,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_confirm_email_failure() -> TestResult {
+    async fn test_confirm_email_incorrect_token() -> TestResult {
         let user_id = Uuid::now_v7();
         let yesterday = Utc::now() - Duration::days(1);
 
@@ -520,6 +530,40 @@ mod tests {
         let service = UserServiceImpl::new(Arc::new(users), Arc::new(MockMailer::new()));
 
         let result = service.confirm_email(&user_id, "incorrect token").await;
+
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_confirm_email_expired_token() -> TestResult {
+        let user_id = Uuid::now_v7();
+        let last_week = Utc::now() - Duration::weeks(1);
+
+        let mut users = MockUserRepository::new();
+
+        users
+            .expect_get_user_by_id()
+            .times(1)
+            .with(eq(user_id.clone()))
+            .returning(move |_| {
+                Ok(User {
+                    id: user_id.clone(),
+                    email: EmailAddress::new_unchecked("email@example.com"),
+                    email_confirmed_at: None,
+                    email_confirmation_token: Some("token".to_string()),
+                    email_confirmation_sent_at: Some(last_week.clone()),
+                    created_at: last_week.clone(),
+                    updated_at: last_week.clone(),
+                })
+            });
+
+        users.expect_update_email_confirmed().times(0);
+
+        let service = UserServiceImpl::new(Arc::new(users), Arc::new(MockMailer::new()));
+
+        let result = service.confirm_email(&user_id, "token").await;
 
         assert!(result.is_err());
 
