@@ -15,7 +15,7 @@ use crate::domain::auth::{
 
 /// User service
 #[async_trait]
-pub trait UserServiceImpl: Clone + Send + Sync + 'static {
+pub trait UserService: Clone + Send + Sync + 'static {
     /// Creates a new user based on the provided request details.
     ///
     /// # Arguments
@@ -29,28 +29,28 @@ pub trait UserServiceImpl: Clone + Send + Sync + 'static {
 
 #[cfg(test)]
 mock! {
-    pub UserServiceImpl {}
+    pub UserService {}
 
-    impl Clone for UserServiceImpl {
+    impl Clone for UserService {
         fn clone(&self) -> Self;
     }
 
     #[async_trait]
-    impl UserServiceImpl for UserServiceImpl {
+    impl UserService for UserService {
         async fn create_user(&self, req: &NewUser) -> Result<Uuid, CreateUserError>;
     }
 }
 
 /// User service implementation
 #[derive(Debug, Clone)]
-pub struct UserService<R>
+pub struct UserServiceImpl<R>
 where
     R: UserRepository,
 {
     repo: Arc<R>,
 }
 
-impl<R> UserService<R>
+impl<R> UserServiceImpl<R>
 where
     R: UserRepository,
 {
@@ -61,7 +61,7 @@ where
 }
 
 #[async_trait]
-impl<R> UserServiceImpl for UserService<R>
+impl<R> UserService for UserServiceImpl<R>
 where
     R: UserRepository,
 {
@@ -103,7 +103,7 @@ mod tests {
             .with(eq(request.clone()))
             .returning(move |_| Ok(expected_id));
 
-        let service = UserService::new(Arc::new(mock));
+        let service = UserServiceImpl::new(Arc::new(mock));
 
         let user_id = service.create_user(&request).await?;
 
@@ -133,7 +133,7 @@ mod tests {
                 })
             });
 
-        let service = UserService::new(Arc::new(mock));
+        let service = UserServiceImpl::new(Arc::new(mock));
 
         let result = service.create_user(&request).await;
 
@@ -159,7 +159,7 @@ mod tests {
             .with(eq(request.clone()))
             .returning(move |_req| Err(CreateUserError::UnknownError(anyhow!("Unknown error"))));
 
-        let service = UserService::new(Arc::new(mock));
+        let service = UserServiceImpl::new(Arc::new(mock));
 
         let result = service.create_user(&request).await;
 

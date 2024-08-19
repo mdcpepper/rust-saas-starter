@@ -29,13 +29,13 @@ mod tests {
     use testresult::TestResult;
 
     use crate::{
-        domain::auth::services::user::MockUserServiceImpl,
+        domain::auth::services::user::MockUserService,
         infrastructure::http::{servers::https::router, state::AppState},
     };
 
     #[tokio::test]
     async fn test_docs_handler() -> TestResult {
-        let state = AppState::new(MockUserServiceImpl::new());
+        let state = AppState::new(MockUserService::new());
 
         let response = TestServer::new(router(state))?
             .get("/api/v1")

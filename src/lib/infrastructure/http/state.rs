@@ -6,11 +6,11 @@ use std::fmt;
 
 use chrono::{DateTime, Utc};
 
-use crate::domain::auth::services::user::UserServiceImpl;
+use crate::domain::auth::services::user::UserService;
 
 /// Global application state
 #[derive(Clone)]
-pub struct AppState<US: UserServiceImpl> {
+pub struct AppState<US: UserService> {
     /// The time the server started
     pub start_time: DateTime<Utc>,
 
@@ -20,7 +20,7 @@ pub struct AppState<US: UserServiceImpl> {
 
 impl<US> AppState<US>
 where
-    US: UserServiceImpl,
+    US: UserService,
 {
     /// Create a new application state
     pub fn new(users: US) -> Self {
@@ -33,7 +33,7 @@ where
 
 impl<US> fmt::Debug for AppState<US>
 where
-    US: UserServiceImpl,
+    US: UserService,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("AppState")

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
-    domain::auth::services::user::UserServiceImpl,
+    domain::auth::services::user::UserService,
     infrastructure::http::{errors::ApiError, state::AppState},
 };
 
@@ -28,7 +28,7 @@ pub struct UptimeResponse {
         (status = 200, description = "Uptime response", body = UptimeResponse),
     )
 )]
-pub async fn handler<US: UserServiceImpl>(
+pub async fn handler<US: UserService>(
     State(state): State<AppState<US>>,
 ) -> Result<Json<UptimeResponse>, ApiError> {
     let uptime = Utc::now().timestamp() - state.start_time.timestamp();
@@ -43,7 +43,7 @@ mod tests {
     use testresult::TestResult;
 
     use crate::{
-        domain::auth::services::user::MockUserServiceImpl,
+        domain::auth::services::user::MockUserService,
         infrastructure::http::{
             handlers::v1::uptime::UptimeResponse, servers::https::router, state::AppState,
         },
@@ -51,7 +51,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_uptime_handler() -> TestResult {
-        let state = AppState::new(MockUserServiceImpl::new());
+        let state = AppState::new(MockUserService::new());
         let start_time = state.start_time.clone();
 
         let response = TestServer::new(router(state))?.get("/api/v1/uptime").await;
