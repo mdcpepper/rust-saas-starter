@@ -135,7 +135,8 @@ impl UserRepository for PostgresDatabase {
         query!(
             r#"
             UPDATE users
-            SET email_confirmed_at = NOW()
+            SET email_confirmed_at = NOW(),
+            email_confirmation_token = NULL
             WHERE id = $1
             "#,
             user_id
