@@ -44,6 +44,11 @@ impl EmailAddress {
 
         Ok(Self(trimmed.to_string()))
     }
+
+    /// Create a new email address without validation
+    pub fn new_unchecked(email: &str) -> EmailAddress {
+        Self(email.to_string())
+    }
 }
 
 impl fmt::Display for EmailAddress {

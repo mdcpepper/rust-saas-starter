@@ -64,8 +64,8 @@ pub struct CreateUserResponse {
         (status = StatusCode::CONFLICT, description = "User already exists", body = ErrorResponse, example = json!({"message": "User with email \"email@example.com\" aleady exists"})),
     )
 )]
-pub async fn handler<US: UserService>(
-    State(state): State<AppState<US>>,
+pub async fn handler<U: UserService>(
+    State(state): State<AppState<U>>,
     request: Result<Json<CreateUserBody>, JsonRejection>,
 ) -> Result<(StatusCode, Json<CreateUserResponse>), ApiError> {
     let Json(request) = request.map_err(ApiError::from)?;
@@ -90,7 +90,7 @@ mod tests {
 
     use crate::{
         domain::auth::{
-            models::user::CreateUserError::DuplicateUser, services::user::MockUserService,
+            errors::CreateUserError, services::user::MockUserService,
             value_objects::email_address::EmailAddress,
         },
         infrastructure::http::{
@@ -181,7 +181,7 @@ mod tests {
         let mut user_service = MockUserService::new();
 
         user_service.expect_create_user().returning(|_| {
-            Err(DuplicateUser {
+            Err(CreateUserError::DuplicateUser {
                 email: EmailAddress::new("email@example.com").expect("valid email"),
             })
         });

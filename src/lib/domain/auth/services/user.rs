@@ -9,7 +9,8 @@ use uuid::Uuid;
 use mockall::mock;
 
 use crate::domain::auth::{
-    models::user::{CreateUserError, NewUser},
+    errors::{CreateUserError, GetUserByIdError},
+    models::user::{NewUser, User},
     repositories::user::UserRepository,
 };
 
@@ -25,6 +26,16 @@ pub trait UserService: Clone + Send + Sync + 'static {
     /// A [`Result`] which is [`Ok`] containing the user's UUID if the user is successfully created,
     /// or an [`Err`] containing a [`CreateUserError`] if the user cannot be created.
     async fn create_user(&self, req: &NewUser) -> Result<Uuid, CreateUserError>;
+
+    /// Retrieves a user by their ID.
+    ///
+    /// # Arguments
+    /// * `id` - The UUID of the user to retrieve.
+    ///
+    /// # Returns
+    /// A [`Result`] which is [`Ok`] containing the [`User`] if found,
+    /// or an [`Err`] containing a [`GetUserError`] if the user cannot be found.
+    async fn get_user_by_id(&self, id: &Uuid) -> Result<User, GetUserByIdError>;
 }
 
 #[cfg(test)]
@@ -38,6 +49,7 @@ mock! {
     #[async_trait]
     impl UserService for UserService {
         async fn create_user(&self, req: &NewUser) -> Result<Uuid, CreateUserError>;
+        async fn get_user_by_id(&self, id: &Uuid) -> Result<User, GetUserByIdError>;
     }
 }
 
@@ -68,6 +80,10 @@ where
     async fn create_user(&self, req: &NewUser) -> Result<Uuid, CreateUserError> {
         self.repo.create_user(req).await
     }
+
+    async fn get_user_by_id(&self, id: &Uuid) -> Result<User, GetUserByIdError> {
+        self.repo.get_user_by_id(id).await
+    }
 }
 
 #[cfg(test)]
@@ -75,16 +91,18 @@ mod tests {
     use std::sync::Arc;
 
     use anyhow::anyhow;
+    use chrono::Utc;
     use mockall::predicate::eq;
     use testresult::TestResult;
     use uuid::Uuid;
 
     use crate::domain::auth::{
-        models::user::{CreateUserError, NewUser},
+        models::user::NewUser,
         repositories::user::MockUserRepository,
-        services::user::{UserService, UserServiceImpl},
         value_objects::{email_address::EmailAddress, password::Password},
     };
+
+    use super::*;
 
     #[tokio::test]
     async fn test_create_user_success() -> TestResult {
@@ -165,6 +183,56 @@ mod tests {
 
         assert!(result.is_err());
         assert!(matches!(result, Err(CreateUserError::UnknownError { .. })));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_user_by_id_success() -> TestResult {
+        let user_id = Uuid::now_v7();
+
+        let user = User {
+            id: user_id.clone(),
+            email: EmailAddress::new_unchecked("mdcpepper@gmail.com"),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let expected_user = user.clone();
+
+        let mut mock = MockUserRepository::new();
+
+        mock.expect_get_user_by_id()
+            .times(1)
+            .with(eq(user_id.clone()))
+            .returning(move |_| Ok(user.clone()));
+
+        let service = UserServiceImpl::new(Arc::new(mock));
+
+        let found_user = service.get_user_by_id(&user_id).await?;
+
+        assert_eq!(found_user, expected_user);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_user_by_id_not_found() -> TestResult {
+        let user_id = Uuid::now_v7();
+
+        let mut mock = MockUserRepository::new();
+
+        mock.expect_get_user_by_id()
+            .times(1)
+            .with(eq(user_id.clone()))
+            .returning(move |_| Err(GetUserByIdError::UserNotFound(user_id.clone())));
+
+        let service = UserServiceImpl::new(Arc::new(mock));
+
+        let result = service.get_user_by_id(&user_id).await;
+
+        assert!(result.is_err());
+        assert!(matches!(result, Err(GetUserByIdError::UserNotFound(id)) if id == user_id));
 
         Ok(())
     }

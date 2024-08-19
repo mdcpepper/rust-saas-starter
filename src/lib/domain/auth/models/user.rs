@@ -1,27 +1,28 @@
 //! User model
 
+use chrono::{DateTime, Utc};
 use password_auth::generate_hash;
-use thiserror::Error;
 use uuid::Uuid;
 
 use crate::domain::auth::value_objects::{email_address::EmailAddress, password::Password};
 
 /// User model
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct User {
     /// User UUID
-    id: Uuid,
+    pub id: Uuid,
 
     /// User email address
-    email: EmailAddress,
+    pub email: EmailAddress,
+
+    /// User created at date in UTC
+    pub created_at: DateTime<Utc>,
+
+    /// User last updated at date in UTC
+    pub updated_at: DateTime<Utc>,
 }
 
 impl User {
-    /// Create a new user
-    pub fn new(id: Uuid, email: EmailAddress) -> Self {
-        Self { id, email }
-    }
-
     /// Get the user's id
     pub fn id(&self) -> &Uuid {
         &self.id
@@ -30,6 +31,16 @@ impl User {
     /// Get the user's email address
     pub fn email(&self) -> &EmailAddress {
         &self.email
+    }
+
+    /// Get the user's created at date
+    pub fn created_at(&self) -> &DateTime<Utc> {
+        &self.created_at
+    }
+
+    /// Get the user's updated at date
+    pub fn updated_at(&self) -> &DateTime<Utc> {
+        &self.updated_at
     }
 }
 
@@ -72,21 +83,6 @@ impl NewUser {
     pub fn password_hash(&self) -> &str {
         &self.password_hash
     }
-}
-
-/// Errors that can occur when creating a user
-#[derive(Debug, Error)]
-pub enum CreateUserError {
-    /// User with email already exists
-    #[error("user with email {email} already exists")]
-    DuplicateUser {
-        /// Email address
-        email: EmailAddress,
-    },
-
-    /// Unknown error
-    #[error(transparent)]
-    UnknownError(#[from] anyhow::Error),
 }
 
 #[cfg(test)]

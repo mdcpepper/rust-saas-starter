@@ -1,17 +1,44 @@
 //! Postgres implementation of the UserRepository trait
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Error};
 use async_trait::async_trait;
-use sqlx::{error::ErrorKind::UniqueViolation, query, Error::Database};
+use chrono::{DateTime, Utc};
+use sqlx::{
+    error::ErrorKind::UniqueViolation,
+    query, query_as,
+    Error::{Database, RowNotFound},
+};
 use uuid::Uuid;
 
 use crate::{
     domain::auth::{
-        models::user::{CreateUserError, NewUser},
+        errors::{CreateUserError, GetUserByIdError},
+        models::user::{NewUser, User},
         repositories::user::UserRepository,
+        value_objects::email_address::EmailAddress,
     },
     infrastructure::db::postgres::PostgresDatabase,
 };
+
+struct UserRecord {
+    id: Uuid,
+    email: String,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+impl TryFrom<UserRecord> for User {
+    type Error = Error;
+
+    fn try_from(record: UserRecord) -> Result<Self, Self::Error> {
+        Ok(User {
+            id: record.id,
+            email: EmailAddress::new_unchecked(record.email.as_ref()),
+            created_at: record.created_at,
+            updated_at: record.updated_at,
+        })
+    }
+}
 
 #[async_trait]
 impl UserRepository for PostgresDatabase {
@@ -42,5 +69,27 @@ impl UserRepository for PostgresDatabase {
         })?;
 
         Ok(result.id)
+    }
+
+    #[mutants::skip]
+    async fn get_user_by_id(&self, id: &Uuid) -> Result<User, GetUserByIdError> {
+        println!("========================== {id}");
+
+        Ok(query_as!(
+            UserRecord,
+            r#"
+            SELECT id, email, created_at, updated_at
+            FROM users
+            WHERE id = $1
+            "#,
+            id
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| match e {
+            RowNotFound => GetUserByIdError::UserNotFound(*id),
+            _ => GetUserByIdError::UnknownError(anyhow!("Unknown database error: {:?}", e)),
+        })?
+        .try_into()?)
     }
 }
