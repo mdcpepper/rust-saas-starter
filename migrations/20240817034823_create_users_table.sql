@@ -1,8 +1,8 @@
 CREATE TABLE IF NOT EXISTS users
 (
-    id uuid primary key not null,
-    email text not null unique,
-    password text not null,
-    created_at timestamp with time zone not null,
-    updated_at timestamp with time zone not null
+    id UUID PRIMARY KEY NOT NULL,
+    email CHARACTER VARYING(255) NOT NULL UNIQUE,
+    password CHARACTER VARYING(255) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL
 )
