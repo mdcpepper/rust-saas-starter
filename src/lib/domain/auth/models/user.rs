@@ -39,8 +39,8 @@ pub struct NewUser {
     /// New user's password
     password_hash: String,
 
-    /// Whether email verification is required
-    email_verification_required: bool,
+    /// Whether email confirmation is required
+    email_confirmation_required: bool,
 }
 
 impl NewUser {
@@ -52,7 +52,7 @@ impl NewUser {
             id,
             email,
             password_hash,
-            email_verification_required: true,
+            email_confirmation_required: true,
         }
     }
 

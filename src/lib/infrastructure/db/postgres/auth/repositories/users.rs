@@ -13,7 +13,7 @@ use uuid::Uuid;
 use crate::{
     domain::{
         auth::{
-            errors::{CreateUserError, GetUserByIdError},
+            errors::{CreateUserError, GetUserByIdError, UpdateUserError},
             models::user::{NewUser, User},
             repositories::user::UserRepository,
         },
@@ -91,5 +91,31 @@ impl UserRepository for PostgresDatabase {
             _ => GetUserByIdError::UnknownError(anyhow!("Unknown database error: {:?}", err)),
         })?
         .try_into()?)
+    }
+
+    #[mutants::skip]
+    async fn update_email_confirmation_token(
+        &self,
+        user_id: &Uuid,
+        token: &str,
+    ) -> Result<(), UpdateUserError> {
+        query!(
+            r#"
+            UPDATE users
+            SET email_confirmation_token = $1,
+            email_confirmation_sent_at = NOW()
+            WHERE id = $2
+            "#,
+            token.to_string(),
+            user_id
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|err| match err {
+            RowNotFound => UpdateUserError::UserNotFound(*user_id),
+            _ => UpdateUserError::UnknownError(anyhow!("Unknown database error: {:?}", err)),
+        })?;
+
+        Ok(())
     }
 }

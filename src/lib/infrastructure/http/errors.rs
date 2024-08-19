@@ -13,7 +13,7 @@ use utoipa::ToSchema;
 
 use crate::domain::{
     auth::{
-        errors::{CreateUserError, GetUserByIdError},
+        errors::{CreateUserError, EmailConfirmationError, GetUserByIdError},
         value_objects::password::PasswordError,
     },
     comms::value_objects::email_address::EmailAddressError,
@@ -120,6 +120,29 @@ impl From<EmailAddressError> for ApiError {
     }
 }
 
+impl From<EmailConfirmationError> for ApiError {
+    fn from(err: EmailConfirmationError) -> Self {
+        match err {
+            EmailConfirmationError::UserNotFound(id) => {
+                ApiError::new_404(&format!("User with id \"{id}\" not found"))
+            }
+            EmailConfirmationError::CouldNotSendEmail => {
+                ApiError::new_500("Could not send email confirmation email")
+            }
+            EmailConfirmationError::EmailAlreadyConfirmed => {
+                ApiError::new_422("Email is already confirmed")
+            }
+            EmailConfirmationError::ConfirmationTokenExpired => {
+                ApiError::new_422("Confirmation token has expired")
+            }
+            EmailConfirmationError::ConfirmationTokenMismatch => {
+                ApiError::new_422("Confirmation token does not match")
+            }
+            EmailConfirmationError::UnknownError(err) => unknown_error(Some(err.to_string())),
+        }
+    }
+}
+
 impl From<PasswordError> for ApiError {
     fn from(err: PasswordError) -> Self {
         match err {
@@ -142,9 +165,7 @@ impl From<CreateUserError> for ApiError {
             CreateUserError::DuplicateUser { email } => {
                 ApiError::new_409(&format!("User with email \"{email}\" already exists"))
             }
-            CreateUserError::UnknownError(_) => {
-                ApiError::new_500("An unknown error occurred, please try again")
-            }
+            CreateUserError::UnknownError(err) => unknown_error(Some(err.to_string())),
         }
     }
 }
@@ -155,9 +176,7 @@ impl From<GetUserByIdError> for ApiError {
             GetUserByIdError::UserNotFound(id) => {
                 ApiError::new_404(&format!("User with id \"{id}\" not found"))
             }
-            GetUserByIdError::UnknownError(_) => {
-                ApiError::new_500("An unknown error occurred, please try again")
-            }
+            GetUserByIdError::UnknownError(err) => unknown_error(Some(err.to_string())),
         }
     }
 }
@@ -165,6 +184,15 @@ impl From<GetUserByIdError> for ApiError {
 impl From<JsonRejection> for ApiError {
     fn from(rejection: JsonRejection) -> Self {
         ApiError::new(rejection.status(), &rejection.body_text())
+    }
+}
+
+fn unknown_error(message: Option<String>) -> ApiError {
+    // TODO: Just log the message and return the generic one
+    if let Some(message) = message {
+        ApiError::new_500(&message)
+    } else {
+        ApiError::new_500("An unknown error occurred, please try again")
     }
 }
 

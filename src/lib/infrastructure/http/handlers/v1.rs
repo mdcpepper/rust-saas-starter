@@ -23,6 +23,10 @@ pub fn router<U: UserService>() -> Router<AppState<U>> {
         .route("/openapi.json", get(Json(ApiDocs::openapi())))
         .route("/uptime", get(uptime::handler))
         .route("/users/:id", get(auth::get_user_by_id::handler))
+        .route(
+            "/users/:id/email/confirmation",
+            post(auth::send_email_confirmation::handler),
+        )
         .route("/users", post(auth::create_user::handler))
         .layer(
             CompressionLayer::new()

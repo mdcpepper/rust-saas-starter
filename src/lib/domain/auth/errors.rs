@@ -57,7 +57,19 @@ pub enum EmailConfirmationError {
 
     /// Unknown error
     #[error(transparent)]
-    UnknownError(anyhow::Error),
+    UnknownError(#[from] anyhow::Error),
+}
+
+/// Errors that can occur when updating a user
+#[derive(Debug, Error)]
+pub enum UpdateUserError {
+    /// User not found
+    #[error("user with id \"{0}\" not found")]
+    UserNotFound(Uuid),
+
+    /// Unknown error
+    #[error(transparent)]
+    UnknownError(#[from] anyhow::Error),
 }
 
 impl From<GetUserByIdError> for EmailConfirmationError {
@@ -72,8 +84,16 @@ impl From<GetUserByIdError> for EmailConfirmationError {
 impl From<EmailError> for EmailConfirmationError {
     fn from(err: EmailError) -> Self {
         match err {
-            EmailError::SendError => EmailConfirmationError::CouldNotSendEmail,
+            EmailError::SendError | EmailError::InvalidEmail => {
+                EmailConfirmationError::CouldNotSendEmail
+            }
             EmailError::UnknownError(e) => EmailConfirmationError::UnknownError(e),
         }
+    }
+}
+
+impl From<askama::Error> for EmailConfirmationError {
+    fn from(_err: askama::Error) -> Self {
+        EmailConfirmationError::CouldNotSendEmail
     }
 }

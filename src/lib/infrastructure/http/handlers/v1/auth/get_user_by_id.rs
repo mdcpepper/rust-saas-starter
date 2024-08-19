@@ -54,9 +54,9 @@ pub async fn handler<U: UserService>(
     State(state): State<AppState<U>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<GetUserByIdResponse>, ApiError> {
-    let user = state.users.get_user_by_id(&id).await?;
+    let user = state.users.get_user_by_id(&id).await?.into();
 
-    Ok(Json(user.into()))
+    Ok(Json(user))
 }
 
 #[cfg(test)]
@@ -74,7 +74,7 @@ mod tests {
         },
         infrastructure::http::{
             errors::ErrorResponse, handlers::v1::auth::get_user_by_id::GetUserByIdResponse,
-            servers::https::router, state::AppState,
+            servers::https::router, state::test_state,
         },
     };
 
@@ -89,14 +89,14 @@ mod tests {
             updated_at: Utc::now(),
         };
 
-        let mut user_service = MockUserService::new();
+        let mut users = MockUserService::new();
 
-        user_service
+        users
             .expect_get_user_by_id()
             .withf(move |id| *id == user.id)
             .returning(move |_| Ok(user.clone()));
 
-        let state = AppState::new(user_service);
+        let state = test_state(Some(users));
 
         let response = TestServer::new(router(state))?
             .get(&format!("/api/v1/users/{}", user_id.clone()))
@@ -115,14 +115,14 @@ mod tests {
     async fn test_get_user_by_id_not_found() -> TestResult {
         let user_id = Uuid::now_v7();
         let expected_user_id = user_id.clone();
-        let mut user_service = MockUserService::new();
+        let mut users = MockUserService::new();
 
-        user_service
+        users
             .expect_get_user_by_id()
             .withf(move |id| *id == user_id)
             .returning(move |_| Err(GetUserByIdError::UserNotFound(user_id.clone())));
 
-        let state = AppState::new(user_service);
+        let state = test_state(Some(users));
 
         let response = TestServer::new(router(state))?
             .get(&format!("/api/v1/users/{user_id}"))

@@ -37,8 +37,8 @@ impl TryFrom<CreateUserBody> for NewUser {
     fn try_from(body: CreateUserBody) -> Result<Self, Self::Error> {
         Ok(Self::new(
             Uuid::now_v7(),
-            EmailAddress::new(&body.email).map_err(ApiError::from)?,
-            Password::new(&body.password).map_err(ApiError::from)?,
+            EmailAddress::new(&body.email)?,
+            Password::new(&body.password)?,
         ))
     }
 }
@@ -69,15 +69,11 @@ pub async fn handler<U: UserService>(
     State(state): State<AppState<U>>,
     request: Result<Json<CreateUserBody>, JsonRejection>,
 ) -> Result<(StatusCode, Json<CreateUserResponse>), ApiError> {
-    let Json(request) = request.map_err(ApiError::from)?;
+    let Json(request) = request?;
 
     let email = request.email.clone();
 
-    let id = state
-        .users
-        .create_user(&request.try_into()?)
-        .await
-        .map_err(ApiError::from)?;
+    let id = state.users.create_user(&request.try_into()?).await?;
 
     Ok((StatusCode::CREATED, Json(CreateUserResponse { id, email })))
 }
@@ -98,7 +94,7 @@ mod tests {
             errors::ErrorResponse,
             handlers::v1::auth::create_user::{CreateUserBody, CreateUserResponse},
             servers::https::router,
-            state::AppState,
+            state::test_state,
         },
     };
 
@@ -125,7 +121,7 @@ mod tests {
             .withf(move |user| user.email() == &email)
             .returning(move |_| Ok(user_id.clone()));
 
-        let state = AppState::new(user_service);
+        let state = test_state(Some(user_service));
 
         let response = TestServer::new(router(state))?
             .post("/api/v1/users")
@@ -142,7 +138,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_user_email_error() -> TestResult {
-        let state = AppState::new(MockUserService::new());
+        let state = test_state(None);
 
         let response = TestServer::new(router(state))?
             .post("/api/v1/users")
@@ -162,7 +158,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_user_password_error() -> TestResult {
-        let state = AppState::new(MockUserService::new());
+        let state = test_state(None);
 
         let response = TestServer::new(router(state))?
             .post("/api/v1/users")
@@ -179,15 +175,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_user_duplicate_user() -> TestResult {
-        let mut user_service = MockUserService::new();
+        let mut users = MockUserService::new();
 
-        user_service.expect_create_user().returning(|_| {
+        users.expect_create_user().returning(|_| {
             Err(CreateUserError::DuplicateUser {
                 email: EmailAddress::new("email@example.com").expect("valid email"),
             })
         });
 
-        let state = AppState::new(user_service);
+        let state = test_state(Some(users));
 
         let response = TestServer::new(router(state))?
             .post("/api/v1/users")

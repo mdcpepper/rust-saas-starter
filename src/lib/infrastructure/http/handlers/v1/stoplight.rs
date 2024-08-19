@@ -28,14 +28,11 @@ mod tests {
     use axum_test::TestServer;
     use testresult::TestResult;
 
-    use crate::{
-        domain::auth::services::user::MockUserService,
-        infrastructure::http::{servers::https::router, state::AppState},
-    };
+    use crate::infrastructure::http::{servers::https::router, state::test_state};
 
     #[tokio::test]
     async fn test_docs_handler() -> TestResult {
-        let state = AppState::new(MockUserService::new());
+        let state = test_state(None);
 
         let response = TestServer::new(router(state))?
             .get("/api/v1")

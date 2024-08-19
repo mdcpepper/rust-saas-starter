@@ -1,19 +1,74 @@
 //! SMTP email service implementation
 
+use anyhow::Result;
 use axum::async_trait;
+use clap::Parser;
+use lettre::{
+    message::header::ContentType,
+    transport::smtp::{
+        authentication::Credentials,
+        client::{Tls, TlsParameters},
+    },
+    Message, SmtpTransport, Transport,
+};
 
 use crate::domain::comms::{
     errors::EmailError, mailer::Mailer, value_objects::email_address::EmailAddress,
 };
 
+/// SMTP configuration
+#[derive(Clone, Default, Debug, Parser)]
+pub struct SMTPConfig {
+    /// The SMTP host
+    #[clap(long, env = "SMTP_HOST")]
+    pub host: String,
+
+    /// The SMTP port
+    #[clap(long, env = "SMTP_PORT")]
+    pub port: u16,
+
+    /// The SMTP username
+    #[clap(long, env = "SMTP_USER")]
+    pub username: String,
+
+    /// The SMTP password
+    #[clap(long, env = "SMTP_PASSWORD")]
+    pub password: String,
+
+    /// The sender email address
+    #[clap(long, env = "SMTP_SENDER")]
+    pub sender: String,
+
+    /// Verify the TLS certificate
+    #[clap(long, env = "SMTP_VERIFY_TLS", default_value = "true")]
+    pub verify_tls: bool,
+}
+
 /// SMTP mailer
-#[derive(Debug, Clone)]
-pub struct SMTPMailer;
+#[derive(Debug, Default, Clone)]
+pub struct SMTPMailer {
+    config: SMTPConfig,
+}
 
 impl SMTPMailer {
     /// Create a new SMTP mailer
-    pub fn new() -> Self {
-        Self
+    pub fn new(config: SMTPConfig) -> Self {
+        Self { config }
+    }
+
+    /// Create a new SMTP mailer from environment variables
+    pub fn mailer(&self) -> Result<SmtpTransport> {
+        let creds = Credentials::new(self.config.username.clone(), self.config.password.clone());
+
+        Ok(SmtpTransport::relay(&self.config.host)?
+            .credentials(creds)
+            .port(self.config.port)
+            .tls(Tls::Opportunistic(
+                TlsParameters::builder(self.config.host.to_string())
+                    .dangerous_accept_invalid_certs(!self.config.verify_tls)
+                    .build()?,
+            ))
+            .build())
     }
 }
 
@@ -21,10 +76,20 @@ impl SMTPMailer {
 impl Mailer for SMTPMailer {
     async fn send_email(
         &self,
-        _to: &EmailAddress,
-        _subject: &str,
-        _body: &str,
+        to: &EmailAddress,
+        subject: &str,
+        body: &str,
     ) -> Result<(), EmailError> {
-        todo!()
+        let email = Message::builder()
+            .from(self.config.sender.parse()?)
+            .to(to.to_string().parse()?)
+            .subject(subject.to_string())
+            .header(ContentType::TEXT_HTML)
+            .body(body.to_string())?;
+
+        match self.mailer()?.send(&email) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(EmailError::UnknownError(e.into())),
+        }
     }
 }

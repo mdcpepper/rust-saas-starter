@@ -42,16 +42,13 @@ mod tests {
     use chrono::Utc;
     use testresult::TestResult;
 
-    use crate::{
-        domain::auth::services::user::MockUserService,
-        infrastructure::http::{
-            handlers::v1::uptime::UptimeResponse, servers::https::router, state::AppState,
-        },
+    use crate::infrastructure::http::{
+        handlers::v1::uptime::UptimeResponse, servers::https::router, state::test_state,
     };
 
     #[tokio::test]
     async fn test_uptime_handler() -> TestResult {
-        let state = AppState::new(MockUserService::new());
+        let state = test_state(None);
         let start_time = state.start_time.clone();
 
         let response = TestServer::new(router(state))?.get("/api/v1/uptime").await;
