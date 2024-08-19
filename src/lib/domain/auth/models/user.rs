@@ -51,14 +51,19 @@ pub struct NewUser {
 
 impl NewUser {
     /// Create a new user request
-    pub fn new(id: Uuid, email: EmailAddress, password: Password) -> Self {
+    pub fn new(
+        id: Uuid,
+        email: EmailAddress,
+        password: Password,
+        email_confirmation_required: bool,
+    ) -> Self {
         let password_hash = generate_hash(password.as_bytes());
 
         Self {
             id,
             email,
             password_hash,
-            email_confirmation_required: true,
+            email_confirmation_required,
         }
     }
 
@@ -75,6 +80,17 @@ impl NewUser {
     /// Get the new user's password hash
     pub fn password_hash(&self) -> &str {
         &self.password_hash
+    }
+
+    /// Get whether email confirmation is required
+    pub fn email_confirmation_required(&self) -> bool {
+        self.email_confirmation_required
+    }
+
+    /// Set whether email confirmation is required
+    pub fn email_confirmation_is_required(&mut self, is_required: bool) -> &mut Self {
+        self.email_confirmation_required = is_required;
+        self
     }
 }
 
@@ -95,6 +111,7 @@ mod tests {
             Uuid::now_v7(),
             EmailAddress::new("email@example.com")?,
             Password::new("correcthorsebatterystaple")?,
+            false,
         );
 
         assert_ne!(create_user.password_hash(), "correcthorsebatterystaple");

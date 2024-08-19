@@ -63,6 +63,7 @@ async fn main() -> Result<()> {
 
     let config = AppConfig {
         base_url: args.server.base_url.clone(),
+        require_email_confirmation: true,
     };
 
     let state = AppState {

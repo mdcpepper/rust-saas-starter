@@ -39,6 +39,7 @@ impl TryFrom<CreateUserBody> for NewUser {
             Uuid::now_v7(),
             EmailAddress::new(&body.email)?,
             Password::new(&body.password)?,
+            true,
         ))
     }
 }
@@ -70,10 +71,16 @@ pub async fn handler<U: UserService>(
     request: Result<Json<CreateUserBody>, JsonRejection>,
 ) -> Result<(StatusCode, Json<CreateUserResponse>), ApiError> {
     let Json(request) = request?;
-
     let email = request.email.clone();
 
-    let id = state.users.create_user(&request.try_into()?).await?;
+    let mut new_user: NewUser = request.try_into()?;
+
+    new_user.email_confirmation_is_required(state.config.require_email_confirmation);
+
+    let id = state
+        .users
+        .create_user(&new_user, &state.config.base_url)
+        .await?;
 
     Ok((StatusCode::CREATED, Json(CreateUserResponse { id, email })))
 }
@@ -118,8 +125,10 @@ mod tests {
 
         user_service
             .expect_create_user()
-            .withf(move |user| user.email() == &email)
-            .returning(move |_| Ok(user_id.clone()));
+            .withf(move |user, base_url| {
+                user.email() == &email && base_url == "https://example.com"
+            })
+            .returning(move |_, _| Ok(user_id.clone()));
 
         let state = test_state(Some(user_service));
 
@@ -177,7 +186,7 @@ mod tests {
     async fn test_create_user_duplicate_user() -> TestResult {
         let mut users = MockUserService::new();
 
-        users.expect_create_user().returning(|_| {
+        users.expect_create_user().returning(|_, _| {
             Err(CreateUserError::DuplicateUser {
                 email: EmailAddress::new("email@example.com").expect("valid email"),
             })

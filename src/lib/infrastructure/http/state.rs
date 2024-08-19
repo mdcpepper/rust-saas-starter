@@ -13,6 +13,9 @@ use crate::domain::auth::services::user::UserService;
 pub struct AppConfig {
     /// The base URL of the application
     pub base_url: String,
+
+    /// Whether to require email confirmation
+    pub require_email_confirmation: bool,
 }
 
 /// Global application state
@@ -67,6 +70,7 @@ pub fn test_state(users: Option<MockUserService>) -> AppState<MockUserService> {
 
     let config = AppConfig {
         base_url: "https://example.com".to_string(),
+        require_email_confirmation: false,
     };
 
     AppState {

@@ -36,7 +36,7 @@ pub trait UserService: Clone + Send + Sync + 'static {
     /// # Returns
     /// A [`Result`] which is [`Ok`] containing the user's UUID if the user is successfully created,
     /// or an [`Err`] containing a [`CreateUserError`] if the user cannot be created.
-    async fn create_user(&self, req: &NewUser) -> Result<Uuid, CreateUserError>;
+    async fn create_user(&self, req: &NewUser, base_url: &str) -> Result<Uuid, CreateUserError>;
 
     /// Retrieves a user by their ID.
     ///
@@ -87,7 +87,7 @@ mock! {
 
     #[async_trait]
     impl UserService for UserService {
-        async fn create_user(&self, req: &NewUser) -> Result<Uuid, CreateUserError>;
+        async fn create_user(&self, req: &NewUser, base_url: &str) -> Result<Uuid, CreateUserError>;
         async fn get_user_by_id(&self, id: &Uuid) -> Result<User, GetUserByIdError>;
         async fn send_email_confirmation(&self, user_id: &Uuid, base_url: &str) -> Result<DateTime<Utc>, EmailConfirmationError>;
         async fn confirm_email(&self, user_id: &Uuid, token: &str) -> Result<(), EmailConfirmationError>;
@@ -151,8 +151,23 @@ where
     R: UserRepository,
     M: Mailer,
 {
-    async fn create_user(&self, req: &NewUser) -> Result<Uuid, CreateUserError> {
-        self.repo.create_user(req).await
+    async fn create_user(&self, req: &NewUser, base_url: &str) -> Result<Uuid, CreateUserError> {
+        let result = self.repo.create_user(req).await;
+
+        let id = *req.id();
+        let base_url = base_url.to_string();
+        let email_confirmation_required = req.email_confirmation_required();
+        let sender = self.clone();
+
+        tokio::spawn(async move {
+            if email_confirmation_required {
+                sender.send_email_confirmation(&id, &base_url).await.ok();
+            } else {
+                sender.repo.update_email_confirmed(&id).await.ok();
+            }
+        });
+
+        result
     }
 
     async fn get_user_by_id(&self, id: &Uuid) -> Result<User, GetUserByIdError> {
@@ -244,6 +259,7 @@ mod tests {
             user_id,
             EmailAddress::new_unchecked("email@example.com"),
             Password::new("correcthorsebatterystaple")?,
+            false,
         );
         let expected_id = request.id().clone();
 
@@ -256,7 +272,7 @@ mod tests {
 
         let service = UserServiceImpl::new(Arc::new(mock), Arc::new(MockMailer::new()));
 
-        let user_id = service.create_user(&request).await?;
+        let user_id = service.create_user(&request, "https://example.com").await?;
 
         assert_eq!(&user_id, request.id());
 
@@ -270,6 +286,7 @@ mod tests {
             user_id,
             EmailAddress::new_unchecked("email@example.com"),
             Password::new("correcthorsebatterystaple")?,
+            false,
         );
         let email = request.email().clone();
 
@@ -286,7 +303,7 @@ mod tests {
 
         let service = UserServiceImpl::new(Arc::new(mock), Arc::new(MockMailer::new()));
 
-        let result = service.create_user(&request).await;
+        let result = service.create_user(&request, "https://example.com").await;
 
         assert!(result.is_err());
         assert!(matches!(result, Err(CreateUserError::DuplicateUser { .. })));
@@ -301,6 +318,7 @@ mod tests {
             user_id,
             EmailAddress::new_unchecked("email@example.com"),
             Password::new("correcthorsebatterystaple")?,
+            false,
         );
 
         let mut mock = MockUserRepository::new();
@@ -312,7 +330,7 @@ mod tests {
 
         let service = UserServiceImpl::new(Arc::new(mock), Arc::new(MockMailer::new()));
 
-        let result = service.create_user(&request).await;
+        let result = service.create_user(&request, "https://example.com").await;
 
         assert!(result.is_err());
         assert!(matches!(result, Err(CreateUserError::UnknownError { .. })));
