@@ -26,6 +26,9 @@ pub trait UserRepository: Clone + Send + Sync + 'static {
         user_id: &Uuid,
         token: &str,
     ) -> Result<(), UpdateUserError>;
+
+    /// Update the email confirmed date for a user
+    async fn update_email_confirmed(&self, user_id: &Uuid) -> Result<(), UpdateUserError>;
 }
 
 #[cfg(test)]
@@ -45,5 +48,6 @@ mock! {
             user_id: &Uuid,
             token: &str,
         ) -> Result<(), UpdateUserError>;
+        async fn update_email_confirmed(&self, user_id: &Uuid) -> Result<(), UpdateUserError>;
     }
 }

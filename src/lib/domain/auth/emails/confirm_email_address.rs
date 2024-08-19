@@ -15,10 +15,26 @@ impl ConfirmEmailAddressTemplate {
     /// Creates a new `ConfirmEmailAddressTemplate`
     pub fn new(base_url: &str, user_id: &Uuid, token: &str) -> Self {
         Self {
-            link: format!(
-                "{}/users/{}/email/confirmation/confirm?token={}",
-                base_url, user_id, token
-            ),
+            link: format!("{base_url}/users/{user_id}/email/confirmation?token={token}"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_confirm_email_address_confirmation_url() {
+        let base_url = "https://example.com";
+        let user_id = Uuid::now_v7();
+        let token = "f9l4Cu5Mpwxu48ITlEfh3QNCgRrda_p23dtSx-ETfkY=";
+
+        let template = ConfirmEmailAddressTemplate::new(base_url, &user_id, token);
+
+        assert_eq!(
+            template.link,
+            format!("https://example.com/users/{user_id}/email/confirmation?token=f9l4Cu5Mpwxu48ITlEfh3QNCgRrda_p23dtSx-ETfkY=")
+        );
     }
 }

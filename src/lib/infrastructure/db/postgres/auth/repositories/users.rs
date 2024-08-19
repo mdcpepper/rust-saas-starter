@@ -26,6 +26,8 @@ struct UserRecord {
     id: Uuid,
     email: String,
     email_confirmed_at: Option<DateTime<Utc>>,
+    email_confirmation_token: Option<String>,
+    email_confirmation_sent_at: Option<DateTime<Utc>>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -38,6 +40,8 @@ impl TryFrom<UserRecord> for User {
             id: record.id,
             email: EmailAddress::new_unchecked(record.email.as_ref()),
             email_confirmed_at: record.email_confirmed_at,
+            email_confirmation_token: record.email_confirmation_token,
+            email_confirmation_sent_at: record.email_confirmation_sent_at,
             created_at: record.created_at,
             updated_at: record.updated_at,
         })
@@ -78,7 +82,14 @@ impl UserRepository for PostgresDatabase {
         Ok(query_as!(
             UserRecord,
             r#"
-            SELECT id, email, email_confirmed_at, created_at, updated_at
+            SELECT
+                id,
+                email,
+                email_confirmed_at,
+                email_confirmation_token,
+                email_confirmation_sent_at,
+                created_at,
+                updated_at
             FROM users
             WHERE id = $1
             "#,
@@ -107,6 +118,26 @@ impl UserRepository for PostgresDatabase {
             WHERE id = $2
             "#,
             token.to_string(),
+            user_id
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|err| match err {
+            RowNotFound => UpdateUserError::UserNotFound(*user_id),
+            _ => UpdateUserError::UnknownError(anyhow!("Unknown database error: {:?}", err)),
+        })?;
+
+        Ok(())
+    }
+
+    #[mutants::skip]
+    async fn update_email_confirmed(&self, user_id: &Uuid) -> Result<(), UpdateUserError> {
+        query!(
+            r#"
+            UPDATE users
+            SET email_confirmed_at = NOW()
+            WHERE id = $1
+            "#,
             user_id
         )
         .execute(&self.pool)

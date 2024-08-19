@@ -66,7 +66,7 @@ pub fn test_state(users: Option<MockUserService>) -> AppState<MockUserService> {
         .unwrap_or_else(|| Arc::new(MockUserService::new()));
 
     let config = AppConfig {
-        base_url: "https://localhost:3443".to_string(),
+        base_url: "https://example.com".to_string(),
     };
 
     AppState {

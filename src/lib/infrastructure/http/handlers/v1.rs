@@ -27,6 +27,10 @@ pub fn router<U: UserService>() -> Router<AppState<U>> {
             "/users/:id/email/confirmation",
             post(auth::send_email_confirmation::handler),
         )
+        .route(
+            "/users/:id/email/confirmation",
+            get(auth::confirm_email::handler),
+        )
         .route("/users", post(auth::create_user::handler))
         .layer(
             CompressionLayer::new()

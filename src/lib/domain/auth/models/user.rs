@@ -17,8 +17,14 @@ pub struct User {
     /// User email address
     pub email: EmailAddress,
 
-    /// Whether the user's email address has been confirmed
+    /// User email confirmed at date in UTC
     pub email_confirmed_at: Option<DateTime<Utc>>,
+
+    /// User email confirmation token
+    pub email_confirmation_token: Option<String>,
+
+    /// User email confirmation sent at date in UTC
+    pub email_confirmation_sent_at: Option<DateTime<Utc>>,
 
     /// User created at date in UTC
     pub created_at: DateTime<Utc>,

@@ -81,6 +81,15 @@ impl From<GetUserByIdError> for EmailConfirmationError {
     }
 }
 
+impl From<UpdateUserError> for EmailConfirmationError {
+    fn from(err: UpdateUserError) -> Self {
+        match err {
+            UpdateUserError::UserNotFound(id) => EmailConfirmationError::UserNotFound(id),
+            UpdateUserError::UnknownError(e) => EmailConfirmationError::UnknownError(e),
+        }
+    }
+}
+
 impl From<EmailError> for EmailConfirmationError {
     fn from(err: EmailError) -> Self {
         match err {

@@ -85,6 +85,8 @@ mod tests {
             id: user_id.clone(),
             email: EmailAddress::new_unchecked("email@example.com"),
             email_confirmed_at: None,
+            email_confirmation_token: None,
+            email_confirmation_sent_at: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };

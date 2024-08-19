@@ -130,7 +130,7 @@ impl From<EmailConfirmationError> for ApiError {
                 ApiError::new_500("Could not send email confirmation email")
             }
             EmailConfirmationError::EmailAlreadyConfirmed => {
-                ApiError::new_422("Email is already confirmed")
+                ApiError::new_409("Email is already confirmed")
             }
             EmailConfirmationError::ConfirmationTokenExpired => {
                 ApiError::new_422("Confirmation token has expired")
