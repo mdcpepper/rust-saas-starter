@@ -8,9 +8,13 @@
 
 //! REST API for the application
 
-use std::sync::Arc;
+use std::{
+    net::{Ipv4Addr, Ipv6Addr, SocketAddr},
+    sync::Arc,
+};
 
 use anyhow::Result;
+use chrono::Utc;
 use clap::Parser;
 use rust_saas_starter::{
     domain::auth::services::user::UserService,
@@ -18,6 +22,7 @@ use rust_saas_starter::{
         database::postgres::{DatabaseConnectionDetails, PostgresDatabase},
         http::{
             servers::{http::HttpServer, https::HttpsServer},
+            state::AppState,
             HttpServerConfig, Server,
         },
     },
@@ -50,17 +55,52 @@ async fn main() -> Result<()> {
 
     let postgres = Arc::new(PostgresDatabase::new(&args.db.connection_string).await?);
 
-    let user_service = UserService::new(postgres);
+    let state = AppState {
+        start_time: Utc::now(),
+        users: Arc::new(UserService::new(postgres)),
+    };
 
-    let http_config = args.server;
+    let http_port = args.server.http_port;
+    let https_port = args.server.https_port;
 
-    let http_server = HttpServer::new(http_config.clone()).await?;
-    let https_server = HttpsServer::new(user_service.clone(), http_config).await?;
-
-    let http = tokio::spawn(http_server.run());
-    let https = tokio::spawn(https_server.run());
-
-    let _ = tokio::join!(http, https);
+    let _ = tokio::join!(
+        tokio::spawn(
+            HttpServer::new(
+                SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), http_port),
+                &args.server.base_url,
+            )
+            .await?
+            .run()
+        ),
+        tokio::spawn(
+            HttpServer::new(
+                SocketAddr::new(Ipv6Addr::UNSPECIFIED.into(), http_port),
+                &args.server.base_url,
+            )
+            .await?
+            .run()
+        ),
+        tokio::spawn(
+            HttpsServer::new(
+                SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), https_port),
+                &args.server.cert_path,
+                &args.server.key_path,
+                state.clone(),
+            )
+            .await?
+            .run()
+        ),
+        tokio::spawn(
+            HttpsServer::new(
+                SocketAddr::new(Ipv6Addr::UNSPECIFIED.into(), https_port),
+                &args.server.cert_path,
+                &args.server.key_path,
+                state,
+            )
+            .await?
+            .run()
+        ),
+    );
 
     Ok(())
 }

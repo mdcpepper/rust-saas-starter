@@ -1,22 +1,16 @@
 //! HTTPS application server
 
-use std::{
-    net::{Ipv4Addr, SocketAddr},
-    sync::Arc,
-};
+use std::net::SocketAddr;
 
 use anyhow::{Context, Result};
 use axum::{async_trait, extract::Request, Router};
 use axum_server::{tls_rustls::RustlsConfig, Handle};
-use chrono::Utc;
 use tower_http::trace::TraceLayer;
 use tracing::{debug, info, info_span};
 
 use crate::{
     domain::auth::services::user::UserManagement,
-    infrastructure::http::{
-        handlers::v1, shutdown_signal, state::AppState, HttpServerConfig, Server,
-    },
+    infrastructure::http::{handlers::v1, shutdown_signal, state::AppState, Server},
 };
 
 /// The application's HTTPS server
@@ -29,15 +23,13 @@ pub struct HttpsServer {
 
 impl HttpsServer {
     /// Returns a new HTTPS server bound to the port specified in `config`.
-    pub async fn new(user_service: impl UserManagement, config: HttpServerConfig) -> Result<Self> {
-        let address = SocketAddr::from((Ipv4Addr::UNSPECIFIED, config.https_port));
-
-        let state = AppState {
-            start_time: Utc::now(),
-            users: Arc::new(user_service),
-        };
-
-        let tls_config = RustlsConfig::from_pem_file(config.cert_path, config.key_path)
+    pub async fn new(
+        address: SocketAddr,
+        cert_path: &str,
+        key_path: &str,
+        state: AppState<impl UserManagement>,
+    ) -> Result<Self> {
+        let tls_config = RustlsConfig::from_pem_file(cert_path, key_path)
             .await
             .context("failed to load TLS config")?;
 

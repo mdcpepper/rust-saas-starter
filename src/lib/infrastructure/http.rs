@@ -13,7 +13,7 @@ mod errors;
 mod handlers;
 mod open_api;
 pub mod servers;
-mod state;
+pub mod state;
 
 /// Configuration for the HTTP server.
 #[derive(Debug, Clone, PartialEq, Eq, Parser)]
