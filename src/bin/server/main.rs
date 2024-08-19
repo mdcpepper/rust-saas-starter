@@ -17,9 +17,9 @@ use anyhow::Result;
 use chrono::Utc;
 use clap::Parser;
 use rust_saas_starter::{
-    domain::auth::services::user::UserService,
+    domain::auth::services::user::UserServiceImpl,
     infrastructure::{
-        database::postgres::{DatabaseConnectionDetails, PostgresDatabase},
+        db::postgres::{DatabaseConnectionDetails, PostgresDatabase},
         http::{
             servers::{http::HttpServer, https::HttpsServer},
             state::AppState,
@@ -57,7 +57,7 @@ async fn main() -> Result<()> {
 
     let state = AppState {
         start_time: Utc::now(),
-        users: Arc::new(UserService::new(postgres)),
+        users: Arc::new(UserServiceImpl::new(postgres)),
     };
 
     let http_port = args.server.http_port;

@@ -6,6 +6,8 @@ use thiserror::Error;
 
 use PostgresDatabaseError::*;
 
+mod auth;
+
 /// Postgres database error
 #[derive(Debug, Error)]
 pub enum PostgresDatabaseError {

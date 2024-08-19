@@ -6,7 +6,7 @@ use rust_saas_starter::{
         repositories::user::UserRepository,
         value_objects::{email_address::EmailAddress, password::Password},
     },
-    infrastructure::database::postgres::{DatabaseConnectionDetails, PostgresDatabase},
+    infrastructure::db::postgres::{DatabaseConnectionDetails, PostgresDatabase},
 };
 use uuid::Uuid;
 

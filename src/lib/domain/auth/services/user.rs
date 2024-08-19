@@ -5,6 +5,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
+#[cfg(test)]
+use mockall::mock;
+
 use crate::domain::auth::{
     models::user::{CreateUserError, NewUser},
     repositories::user::UserRepository,
@@ -12,7 +15,7 @@ use crate::domain::auth::{
 
 /// User service
 #[async_trait]
-pub trait UserManagement: Clone + Send + Sync + 'static {
+pub trait UserService: Clone + Send + Sync + 'static {
     /// Creates a new user based on the provided request details.
     ///
     /// # Arguments
@@ -24,16 +27,30 @@ pub trait UserManagement: Clone + Send + Sync + 'static {
     async fn create_user(&self, req: &NewUser) -> Result<Uuid, CreateUserError>;
 }
 
+#[cfg(test)]
+mock! {
+    pub UserService {}
+
+    impl Clone for UserService {
+        fn clone(&self) -> Self;
+    }
+
+    #[async_trait]
+    impl UserService for UserService {
+        async fn create_user(&self, req: &NewUser) -> Result<Uuid, CreateUserError>;
+    }
+}
+
 /// User service implementation
 #[derive(Debug, Clone)]
-pub struct UserService<R>
+pub struct UserServiceImpl<R>
 where
     R: UserRepository,
 {
     repo: Arc<R>,
 }
 
-impl<R> UserService<R>
+impl<R> UserServiceImpl<R>
 where
     R: UserRepository,
 {
@@ -44,7 +61,7 @@ where
 }
 
 #[async_trait]
-impl<R> UserManagement for UserService<R>
+impl<R> UserService for UserServiceImpl<R>
 where
     R: UserRepository,
 {
@@ -65,7 +82,7 @@ mod tests {
     use crate::domain::auth::{
         models::user::{CreateUserError, NewUser},
         repositories::user::MockUserRepository,
-        services::user::{UserManagement, UserService},
+        services::user::{UserService, UserServiceImpl},
         value_objects::{email_address::EmailAddress, password::Password},
     };
 
@@ -86,7 +103,7 @@ mod tests {
             .with(eq(request.clone()))
             .returning(move |_| Ok(expected_id));
 
-        let service = UserService::new(Arc::new(mock));
+        let service = UserServiceImpl::new(Arc::new(mock));
 
         let user_id = service.create_user(&request).await?;
 
@@ -116,7 +133,7 @@ mod tests {
                 })
             });
 
-        let service = UserService::new(Arc::new(mock));
+        let service = UserServiceImpl::new(Arc::new(mock));
 
         let result = service.create_user(&request).await;
 
@@ -142,7 +159,7 @@ mod tests {
             .with(eq(request.clone()))
             .returning(move |_req| Err(CreateUserError::UnknownError(anyhow!("Unknown error"))));
 
-        let service = UserService::new(Arc::new(mock));
+        let service = UserServiceImpl::new(Arc::new(mock));
 
         let result = service.create_user(&request).await;
 
