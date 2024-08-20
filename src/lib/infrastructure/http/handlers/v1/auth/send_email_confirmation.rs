@@ -10,7 +10,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    domain::auth::services::user::UserService,
+    domain::auth::services::{email_address::EmailAddressService, user::UserService},
     infrastructure::http::{errors::ApiError, state::AppState},
 };
 
@@ -34,13 +34,15 @@ pub struct SendEmailConfirmationResponse {
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ErrorResponse, example = json!({ "error": "Failed to send email confirmation: <error>" })),
     )
 )]
-pub async fn handler<U: UserService>(
-    State(state): State<AppState<U>>,
+pub async fn handler<U: UserService, E: EmailAddressService>(
+    State(state): State<AppState<U, E>>,
     Path(user_id): Path<Uuid>,
 ) -> Result<(StatusCode, Json<SendEmailConfirmationResponse>), ApiError> {
+    let user = state.users.get_user_by_id(&user_id).await?;
+
     state
-        .users
-        .send_email_confirmation(&user_id, &state.config.base_url)
+        .email_addresses
+        .send_email_confirmation(&user, &state.config.base_url)
         .await?;
 
     Ok((
@@ -60,7 +62,9 @@ mod tests {
     use crate::{
         domain::{
             auth::{
-                errors::EmailConfirmationError, models::user::User, services::user::MockUserService,
+                errors::GetUserByIdError,
+                models::user::User,
+                services::{email_address::MockEmailAddressService, user::MockUserService},
             },
             communication::value_objects::email_address::EmailAddress,
         },
@@ -87,19 +91,20 @@ mod tests {
         };
 
         let mut users = MockUserService::new();
+        let mut email_addresses = MockEmailAddressService::new();
 
         users
             .expect_get_user_by_id()
             .withf(move |id| *id == user.id)
             .returning(move |_| Ok(user.clone()));
 
-        users
+        email_addresses
             .expect_send_email_confirmation()
             .times(1)
-            .withf(move |id, base_url| *id == user_id.clone() && base_url == "https://example.com")
+            .withf(move |user, base_url| *user == user.clone() && base_url == "https://example.com")
             .returning(move |_, _| Ok(Utc::now() + Duration::days(1)));
 
-        let state = test_state(Some(users));
+        let state = test_state(Some(users), Some(email_addresses));
 
         let response = TestServer::new(router(state))?
             .post(&format!(
@@ -121,16 +126,16 @@ mod tests {
         let user_id = Uuid::now_v7();
 
         let mut users = MockUserService::new();
+        let mut email_addresses = MockEmailAddressService::new();
 
         users
-            .expect_send_email_confirmation()
-            .times(1)
-            .withf(move |id, base_url| *id == user_id && base_url == "https://example.com")
-            .returning(move |user_id, _| {
-                Err(EmailConfirmationError::UserNotFound(user_id.clone()))
-            });
+            .expect_get_user_by_id()
+            .withf(move |id| *id == user_id)
+            .returning(move |_| Err(GetUserByIdError::UserNotFound(user_id)));
 
-        let state = test_state(Some(users));
+        email_addresses.expect_send_email_confirmation().times(0);
+
+        let state = test_state(Some(users), Some(email_addresses));
 
         let response = TestServer::new(router(state))?
             .post(&format!(

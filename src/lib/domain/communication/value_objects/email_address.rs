@@ -51,6 +51,12 @@ impl EmailAddress {
     }
 }
 
+impl Default for EmailAddress {
+    fn default() -> Self {
+        Self::new_unchecked("email@example.com")
+    }
+}
+
 impl fmt::Display for EmailAddress {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)

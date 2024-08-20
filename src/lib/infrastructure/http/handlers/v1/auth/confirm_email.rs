@@ -8,7 +8,10 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    domain::auth::{errors::EmailConfirmationError, services::user::UserService},
+    domain::auth::{
+        errors::{EmailConfirmationError, GetUserByIdError},
+        services::{email_address::EmailAddressService, user::UserService},
+    },
     infrastructure::http::{
         state::AppState,
         templates::{
@@ -32,27 +35,44 @@ pub struct EmailConfirmedResponse {
     success: bool,
 }
 
-pub async fn handler<U: UserService>(
-    State(state): State<AppState<U>>,
+pub async fn handler<U: UserService, E: EmailAddressService>(
+    State(state): State<AppState<U, E>>,
     Path(user_id): Path<Uuid>,
     Query(query): Query<ConfirmEmailParams>,
 ) -> (StatusCode, impl IntoResponse) {
-    match state.users.confirm_email(&user_id, &query.token).await {
-        Ok(_) => (StatusCode::OK, EmailConfirmedTemplate.into_response()),
+    let user = state.users.get_user_by_id(&user_id).await;
+
+    match user {
+        Ok(user) => match state
+            .email_addresses
+            .confirm_email(&user, &query.token)
+            .await
+        {
+            Ok(_) => (StatusCode::OK, EmailConfirmedTemplate.into_response()),
+            Err(err) => match err {
+                EmailConfirmationError::UserNotFound(_) => {
+                    (StatusCode::NOT_FOUND, NotFoundErrorTemplate.into_response())
+                }
+                EmailConfirmationError::ConfirmationTokenExpired
+                | EmailConfirmationError::ConfirmationTokenMismatch => (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    UnprocessableEntityErrorTemplate.into_response(),
+                ),
+                EmailConfirmationError::EmailAlreadyConfirmed => (
+                    StatusCode::CONFLICT,
+                    UnprocessableEntityErrorTemplate.into_response(),
+                ),
+                _ => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    InternalServerErrorTemplate.into_response(),
+                ),
+            },
+        },
         Err(err) => match err {
-            EmailConfirmationError::UserNotFound(_) => {
+            GetUserByIdError::UserNotFound(_) => {
                 (StatusCode::NOT_FOUND, NotFoundErrorTemplate.into_response())
             }
-            EmailConfirmationError::ConfirmationTokenExpired
-            | EmailConfirmationError::ConfirmationTokenMismatch => (
-                StatusCode::UNPROCESSABLE_ENTITY,
-                UnprocessableEntityErrorTemplate.into_response(),
-            ),
-            EmailConfirmationError::EmailAlreadyConfirmed => (
-                StatusCode::CONFLICT,
-                UnprocessableEntityErrorTemplate.into_response(),
-            ),
-            _ => (
+            GetUserByIdError::UnknownError(_) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 InternalServerErrorTemplate.into_response(),
             ),
@@ -68,7 +88,11 @@ mod tests {
     use uuid::Uuid;
 
     use crate::{
-        domain::auth::{errors::EmailConfirmationError, services::user::MockUserService},
+        domain::auth::{
+            errors::EmailConfirmationError,
+            models::user::User,
+            services::{email_address::MockEmailAddressService, user::MockUserService},
+        },
         infrastructure::http::{servers::https::router, state::test_state},
     };
 
@@ -77,14 +101,24 @@ mod tests {
         let user_id = Uuid::now_v7();
 
         let mut users = MockUserService::new();
+        let mut email_addresses = MockEmailAddressService::new();
+
+        let user = User::default();
+        let expected_user = user.clone();
 
         users
+            .expect_get_user_by_id()
+            .times(1)
+            .withf(move |id| *id == user_id)
+            .returning(move |_| Ok(user.clone()));
+
+        email_addresses
             .expect_confirm_email()
             .times(1)
-            .withf(move |id, token| *id == user_id.clone() && token == "test-token")
+            .withf(move |user, token| *user == expected_user && token == "test-token")
             .returning(move |_, _| Ok(()));
 
-        let state = test_state(Some(users));
+        let state = test_state(Some(users), Some(email_addresses));
 
         let response = TestServer::new(router(state))?
             .get(&format!(
@@ -105,14 +139,24 @@ mod tests {
         let user_id = Uuid::now_v7();
 
         let mut users = MockUserService::new();
+        let mut email_addresses = MockEmailAddressService::new();
+
+        let user = User::default();
+        let expected_user = user.clone();
 
         users
+            .expect_get_user_by_id()
+            .times(1)
+            .withf(move |id| *id == user_id)
+            .returning(move |_| Ok(user.clone()));
+
+        email_addresses
             .expect_confirm_email()
             .times(1)
-            .withf(move |id, token| *id == user_id.clone() && token == "test-token")
+            .withf(move |user, token| *user == expected_user && token == "test-token")
             .returning(move |_, _| Err(EmailConfirmationError::UserNotFound(user_id.clone())));
 
-        let state = test_state(Some(users));
+        let state = test_state(Some(users), Some(email_addresses));
 
         let response = TestServer::new(router(state))?
             .get(&format!(
@@ -133,14 +177,24 @@ mod tests {
         let user_id = Uuid::now_v7();
 
         let mut users = MockUserService::new();
+        let mut email_addresses = MockEmailAddressService::new();
+
+        let user = User::default();
+        let expected_user = user.clone();
 
         users
+            .expect_get_user_by_id()
+            .times(1)
+            .withf(move |id| *id == user_id)
+            .returning(move |_| Ok(user.clone()));
+
+        email_addresses
             .expect_confirm_email()
             .times(1)
-            .withf(move |id, token| *id == user_id.clone() && token == "test-token")
+            .withf(move |user, token| *user == expected_user && token == "test-token")
             .returning(move |_, _| Err(EmailConfirmationError::ConfirmationTokenMismatch));
 
-        let state = test_state(Some(users));
+        let state = test_state(Some(users), Some(email_addresses));
 
         let response = TestServer::new(router(state))?
             .get(&format!(
@@ -160,14 +214,24 @@ mod tests {
         let user_id = Uuid::now_v7();
 
         let mut users = MockUserService::new();
+        let mut email_addresses = MockEmailAddressService::new();
+
+        let user = User::default();
+        let expected_user = user.clone();
 
         users
+            .expect_get_user_by_id()
+            .times(1)
+            .withf(move |id| *id == user_id)
+            .returning(move |_| Ok(user.clone()));
+
+        email_addresses
             .expect_confirm_email()
             .times(1)
-            .withf(move |id, token| *id == user_id.clone() && token == "test-token")
+            .withf(move |user, token| *user == expected_user && token == "test-token")
             .returning(move |_, _| Err(EmailConfirmationError::EmailAlreadyConfirmed));
 
-        let state = test_state(Some(users));
+        let state = test_state(Some(users), Some(email_addresses));
 
         let response = TestServer::new(router(state))?
             .get(&format!(

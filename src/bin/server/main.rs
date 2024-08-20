@@ -17,7 +17,7 @@ use anyhow::Result;
 use chrono::Utc;
 use clap::Parser;
 use rust_saas_starter::{
-    domain::auth::services::user::UserServiceImpl,
+    domain::auth::services::{email_address::EmailAddressServiceImpl, user::UserServiceImpl},
     infrastructure::{
         db::postgres::{DatabaseConnectionDetails, PostgresDatabase},
         email::smtp::{SMTPConfig, SMTPMailer},
@@ -67,13 +67,13 @@ async fn main() -> Result<()> {
 
     let config = AppConfig {
         base_url: args.server.base_url.clone(),
-        require_email_confirmation: true,
     };
 
     let state = AppState {
         config,
         start_time: Utc::now(),
-        users: Arc::new(UserServiceImpl::new(postgres, mailer)),
+        users: Arc::new(UserServiceImpl::new(postgres.clone())),
+        email_addresses: Arc::new(EmailAddressServiceImpl::new(postgres, mailer)),
     };
 
     let http_port = args.server.http_port;

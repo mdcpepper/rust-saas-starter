@@ -8,7 +8,7 @@ use tower_http::compression::CompressionLayer;
 use utoipa::OpenApi;
 
 use crate::{
-    domain::auth::services::user::UserService,
+    domain::auth::services::{email_address::EmailAddressService, user::UserService},
     infrastructure::http::{open_api::ApiDocs, state::AppState},
 };
 
@@ -17,7 +17,7 @@ pub mod stoplight;
 pub mod uptime;
 
 /// Create the router for version 1 of the API
-pub fn router<U: UserService>() -> Router<AppState<U>> {
+pub fn router<U: UserService, E: EmailAddressService>() -> Router<AppState<U, E>> {
     Router::new()
         .route("/", get(stoplight::handler))
         .route("/openapi.json", get(Json(ApiDocs::openapi())))

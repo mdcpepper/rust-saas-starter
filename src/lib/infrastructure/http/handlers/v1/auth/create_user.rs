@@ -12,7 +12,9 @@ use uuid::Uuid;
 use crate::{
     domain::{
         auth::{
-            models::user::NewUser, services::user::UserService, value_objects::password::Password,
+            models::user::NewUser,
+            services::{email_address::EmailAddressService, user::UserService},
+            value_objects::password::Password,
         },
         communication::value_objects::email_address::EmailAddress,
     },
@@ -39,7 +41,6 @@ impl TryFrom<CreateUserBody> for NewUser {
             Uuid::now_v7(),
             EmailAddress::new(&body.email)?,
             Password::new(&body.password)?,
-            true,
         ))
     }
 }
@@ -66,21 +67,16 @@ pub struct CreateUserResponse {
         (status = StatusCode::CONFLICT, description = "User already exists", body = ErrorResponse, example = json!({"message": "User with email \"email@example.com\" aleady exists"})),
     )
 )]
-pub async fn handler<U: UserService>(
-    State(state): State<AppState<U>>,
+pub async fn handler<U: UserService, E: EmailAddressService>(
+    State(state): State<AppState<U, E>>,
     request: Result<Json<CreateUserBody>, JsonRejection>,
 ) -> Result<(StatusCode, Json<CreateUserResponse>), ApiError> {
     let Json(request) = request?;
     let email = request.email.clone();
 
-    let mut new_user: NewUser = request.try_into()?;
+    let new_user: NewUser = request.try_into()?;
 
-    new_user.email_confirmation_is_required(state.config.require_email_confirmation);
-
-    let id = state
-        .users
-        .create_user(&new_user, &state.config.base_url)
-        .await?;
+    let id = state.users.create_user(&new_user).await?;
 
     Ok((StatusCode::CREATED, Json(CreateUserResponse { id, email })))
 }
@@ -125,12 +121,10 @@ mod tests {
 
         user_service
             .expect_create_user()
-            .withf(move |user, base_url| {
-                user.email() == &email && base_url == "https://example.com"
-            })
-            .returning(move |_, _| Ok(user_id.clone()));
+            .withf(move |user| user.email() == &email)
+            .returning(move |_| Ok(user_id.clone()));
 
-        let state = test_state(Some(user_service));
+        let state = test_state(Some(user_service), None);
 
         let response = TestServer::new(router(state))?
             .post("/api/v1/users")
@@ -147,7 +141,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_user_email_error() -> TestResult {
-        let state = test_state(None);
+        let state = test_state(None, None);
 
         let response = TestServer::new(router(state))?
             .post("/api/v1/users")
@@ -167,7 +161,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_user_password_error() -> TestResult {
-        let state = test_state(None);
+        let state = test_state(None, None);
 
         let response = TestServer::new(router(state))?
             .post("/api/v1/users")
@@ -186,13 +180,13 @@ mod tests {
     async fn test_create_user_duplicate_user() -> TestResult {
         let mut users = MockUserService::new();
 
-        users.expect_create_user().returning(|_, _| {
+        users.expect_create_user().returning(|_| {
             Err(CreateUserError::DuplicateUser {
                 email: EmailAddress::new("email@example.com").expect("valid email"),
             })
         });
 
-        let state = test_state(Some(users));
+        let state = test_state(Some(users), None);
 
         let response = TestServer::new(router(state))?
             .post("/api/v1/users")

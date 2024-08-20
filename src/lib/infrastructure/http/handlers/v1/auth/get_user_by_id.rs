@@ -10,7 +10,10 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    domain::auth::{models::user::User, services::user::UserService},
+    domain::auth::{
+        models::user::User,
+        services::{email_address::EmailAddressService, user::UserService},
+    },
     infrastructure::http::{errors::ApiError, state::AppState},
 };
 
@@ -50,8 +53,8 @@ impl From<User> for GetUserByIdResponse {
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ErrorResponse),
     )
 )]
-pub async fn handler<U: UserService>(
-    State(state): State<AppState<U>>,
+pub async fn handler<U: UserService, E: EmailAddressService>(
+    State(state): State<AppState<U, E>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<GetUserByIdResponse>, ApiError> {
     let user = state.users.get_user_by_id(&id).await?.into();
@@ -98,7 +101,7 @@ mod tests {
             .withf(move |id| *id == user.id)
             .returning(move |_| Ok(user.clone()));
 
-        let state = test_state(Some(users));
+        let state = test_state(Some(users), None);
 
         let response = TestServer::new(router(state))?
             .get(&format!("/api/v1/users/{}", user_id.clone()))
@@ -124,7 +127,7 @@ mod tests {
             .withf(move |id| *id == user_id)
             .returning(move |_| Err(GetUserByIdError::UserNotFound(user_id.clone())));
 
-        let state = test_state(Some(users));
+        let state = test_state(Some(users), None);
 
         let response = TestServer::new(router(state))?
             .get(&format!("/api/v1/users/{user_id}"))

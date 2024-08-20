@@ -32,7 +32,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_docs_handler() -> TestResult {
-        let state = test_state(None);
+        let state = test_state(None, None);
 
         let response = TestServer::new(router(state))?
             .get("/api/v1")
