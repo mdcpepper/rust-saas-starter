@@ -25,6 +25,26 @@ use crate::domain::{
 
 use super::EmailAddress;
 
+/// The type of email confirmation
+#[derive(Debug, PartialEq, Eq)]
+pub enum EmailConfirmationType {
+    /// The user is confirming their current email address
+    CurrentEmail,
+
+    /// The user is confirming a new email address
+    NewEmail(EmailAddress),
+}
+
+impl EmailConfirmationType {
+    /// Gets the subject of the email confirmation
+    pub fn subject(&self) -> &str {
+        match self {
+            Self::CurrentEmail => "Please confirm your email address",
+            Self::NewEmail(_) => "Please confirm your new email address",
+        }
+    }
+}
+
 /// Email address service
 #[async_trait]
 pub trait EmailAddressService: Clone + Send + Sync + 'static {
@@ -40,23 +60,7 @@ pub trait EmailAddressService: Clone + Send + Sync + 'static {
     async fn send_email_confirmation(
         &self,
         user: &User,
-        base_url: &str,
-    ) -> Result<DateTime<Utc>, EmailConfirmationError>;
-
-    /// Sends an email confirmation to the user for changing their email address.
-    ///
-    /// # Arguments
-    /// * `user` - The user to send the email confirmation to.
-    /// * `new_email` - The new email address to confirm.
-    /// * `base_url` - The base URL of the application.
-    ///
-    /// # Returns
-    /// - [`Ok`] with a [`DateTime<Utc>`] representing the token's expiration time if successful.
-    /// - [`Err`] containing an [`EmailConfirmationError`] if the email confirmation could not be sent.
-    async fn send_change_email_confirmation(
-        &self,
-        user: &User,
-        new_email: &EmailAddress,
+        confirmation_type: EmailConfirmationType,
         base_url: &str,
     ) -> Result<DateTime<Utc>, EmailConfirmationError>;
 
@@ -81,8 +85,12 @@ mock! {
 
     #[async_trait]
     impl EmailAddressService for EmailAddressService {
-        async fn send_email_confirmation(&self, user: &User, base_url: &str) -> Result<DateTime<Utc>, EmailConfirmationError>;
-        async fn send_change_email_confirmation(&self, user: &User, new_email: &EmailAddress, base_url: &str) -> Result<DateTime<Utc>, EmailConfirmationError>;
+        async fn send_email_confirmation(
+            &self,
+            user: &User,
+            confirmation_type: EmailConfirmationType,
+            base_url: &str,
+        ) -> Result<DateTime<Utc>, EmailConfirmationError>;
         async fn confirm_email(&self, user: &User, token: &str) -> Result<(), EmailConfirmationError>;
     }
 }
@@ -142,14 +150,20 @@ where
     async fn send_email_confirmation(
         &self,
         user: &User,
+        confirmation_type: EmailConfirmationType,
         base_url: &str,
     ) -> Result<DateTime<Utc>, EmailConfirmationError> {
         if user.email_confirmed_at.is_some() && user.new_email.is_none() {
             return Err(EmailConfirmationError::EmailAlreadyConfirmed);
         }
 
+        let (new_email, recipient) = match &confirmation_type {
+            EmailConfirmationType::CurrentEmail => (None, &user.email),
+            EmailConfirmationType::NewEmail(email) => (Some(email), email),
+        };
+
         let (token, expires_at) = self
-            .generate_email_confirmation_token(&user.id, None)
+            .generate_email_confirmation_token(&user.id, new_email)
             .await?;
 
         let template = ConfirmEmailAddressTemplate::new(base_url, &user.id, &token);
@@ -157,38 +171,7 @@ where
         let plain = template.render_plain()?;
 
         self.mailer
-            .send_email(
-                &user.email,
-                "Please confirm your email address",
-                &html,
-                &plain,
-            )
-            .await?;
-
-        Ok(expires_at)
-    }
-
-    async fn send_change_email_confirmation(
-        &self,
-        user: &User,
-        new_email: &EmailAddress,
-        base_url: &str,
-    ) -> Result<DateTime<Utc>, EmailConfirmationError> {
-        let (token, expires_at) = self
-            .generate_email_confirmation_token(&user.id, Some(new_email))
-            .await?;
-
-        let template = ConfirmEmailAddressTemplate::new(base_url, &user.id, &token);
-        let html = css_inline::inline(&template.render()?)?;
-        let plain = template.render_plain()?;
-
-        self.mailer
-            .send_email(
-                new_email,
-                "Please confirm your new email address",
-                &html,
-                &plain,
-            )
+            .send_email(recipient, confirmation_type.subject(), &html, &plain)
             .await?;
 
         Ok(expires_at)
@@ -296,7 +279,11 @@ mod tests {
         let service = EmailAddressServiceImpl::new(Arc::new(users), Arc::new(mailer));
 
         let expires_at = service
-            .send_email_confirmation(&expected_user, "https://localhost:3443")
+            .send_email_confirmation(
+                &expected_user,
+                EmailConfirmationType::CurrentEmail,
+                "https://localhost:3443",
+            )
             .await?;
 
         assert!(expires_at > Utc::now());
@@ -324,7 +311,11 @@ mod tests {
         let service = EmailAddressServiceImpl::new(Arc::new(users), Arc::new(mailer));
 
         let result = service
-            .send_email_confirmation(&user, "https://localhost:3443")
+            .send_email_confirmation(
+                &user,
+                EmailConfirmationType::CurrentEmail,
+                "https://localhost:3443",
+            )
             .await;
 
         assert!(result.is_err());

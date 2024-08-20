@@ -13,7 +13,9 @@ use uuid::Uuid;
 use crate::{
     domain::{
         auth::users::UserService,
-        communication::email_addresses::{EmailAddress, EmailAddressService},
+        communication::email_addresses::{
+            EmailAddress, EmailAddressService, EmailConfirmationType,
+        },
     },
     infrastructure::http::{errors::ApiError, state::AppState},
 };
@@ -56,7 +58,11 @@ pub async fn handler<U: UserService, E: EmailAddressService>(
 
     let expires_at = state
         .email_addresses
-        .send_change_email_confirmation(&user, &request.email, &state.config.base_url)
+        .send_email_confirmation(
+            &user,
+            EmailConfirmationType::NewEmail(request.email),
+            &state.config.base_url,
+        )
         .await?;
 
     Ok((
@@ -77,7 +83,9 @@ mod tests {
     use crate::{
         domain::{
             auth::users::{tests::MockUserService, User},
-            communication::email_addresses::{tests::MockEmailAddressService, EmailAddress},
+            communication::email_addresses::{
+                tests::MockEmailAddressService, EmailAddress, EmailConfirmationType,
+            },
         },
         infrastructure::http::{servers::https::router, state::tests::test_state},
     };
@@ -90,6 +98,7 @@ mod tests {
         let yesterday = Utc::now() - Duration::days(1);
         let changed_email = EmailAddress::new_unchecked("new_email@example.com");
         let expected_email = changed_email.clone();
+        let expected_confirmation_type = EmailConfirmationType::NewEmail(changed_email.clone());
 
         let user = User {
             id: user_id.clone(),
@@ -113,11 +122,11 @@ mod tests {
             .returning(move |_| Ok(user.clone()));
 
         email_addresses
-            .expect_send_change_email_confirmation()
+            .expect_send_email_confirmation()
             .times(1)
-            .withf(move |user, new_email, base_url| {
+            .withf(move |user, confirmation_type, base_url| {
                 *user == user.clone()
-                    && *new_email == changed_email.clone()
+                    && *confirmation_type == expected_confirmation_type
                     && base_url == "https://example.com"
             })
             .returning(move |_, _, _| Ok(expected_expiry.clone()));

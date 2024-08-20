@@ -11,7 +11,10 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    domain::{auth::users::UserService, communication::email_addresses::EmailAddressService},
+    domain::{
+        auth::users::UserService,
+        communication::email_addresses::{EmailAddressService, EmailConfirmationType},
+    },
     infrastructure::http::{errors::ApiError, state::AppState},
 };
 
@@ -44,7 +47,11 @@ pub async fn handler<U: UserService, E: EmailAddressService>(
 
     let expires_at = state
         .email_addresses
-        .send_email_confirmation(&user, &state.config.base_url)
+        .send_email_confirmation(
+            &user,
+            EmailConfirmationType::CurrentEmail,
+            &state.config.base_url,
+        )
         .await?;
 
     Ok((
@@ -102,8 +109,10 @@ mod tests {
         email_addresses
             .expect_send_email_confirmation()
             .times(1)
-            .withf(move |user, base_url| *user == user.clone() && base_url == "https://example.com")
-            .returning(move |_, _| Ok(expected_expiry.clone()));
+            .withf(move |user, _, base_url| {
+                *user == user.clone() && base_url == "https://example.com"
+            })
+            .returning(move |_, _, _| Ok(expected_expiry.clone()));
 
         let state = test_state(Some(users), Some(email_addresses));
 
