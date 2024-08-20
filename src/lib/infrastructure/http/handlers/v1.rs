@@ -7,7 +7,7 @@ use axum::{
 use utoipa::OpenApi;
 
 use crate::{
-    domain::auth::services::{email_address::EmailAddressService, user::UserService},
+    domain::{auth::users::UserService, communication::email_addresses::EmailAddressService},
     infrastructure::http::{open_api::ApiDocs, state::AppState},
 };
 

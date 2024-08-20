@@ -4,10 +4,7 @@ use chrono::{DateTime, Utc};
 use password_auth::generate_hash;
 use uuid::Uuid;
 
-use crate::domain::{
-    auth::value_objects::password::Password,
-    communication::value_objects::email_address::EmailAddress,
-};
+use crate::domain::{auth::users::Password, communication::email_addresses::EmailAddress};
 
 /// User model
 #[derive(Clone, Default, Debug, PartialEq, Eq)]
@@ -80,10 +77,7 @@ mod tests {
     use testresult::TestResult;
     use uuid::Uuid;
 
-    use crate::domain::{
-        auth::value_objects::password::Password,
-        communication::value_objects::email_address::EmailAddress,
-    };
+    use crate::domain::{auth::users::Password, communication::email_addresses::EmailAddress};
 
     use super::NewUser;
 

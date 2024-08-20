@@ -12,11 +12,11 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::domain::{
-    auth::{
+    auth::users::{
         errors::{CreateUserError, EmailConfirmationError, GetUserByIdError},
-        value_objects::password::PasswordError,
+        PasswordError,
     },
-    communication::value_objects::email_address::EmailAddressError,
+    communication::email_addresses::EmailAddressError,
 };
 
 /// An error response

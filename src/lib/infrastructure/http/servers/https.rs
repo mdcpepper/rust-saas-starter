@@ -9,7 +9,7 @@ use tower_http::{catch_panic::CatchPanicLayer, compression::CompressionLayer, tr
 use tracing::{debug, info, info_span};
 
 use crate::{
-    domain::auth::services::{email_address::EmailAddressService, user::UserService},
+    domain::{auth::users::UserService, communication::email_addresses::EmailAddressService},
     infrastructure::http::{
         handlers::{panic_handler, v1},
         shutdown_signal,

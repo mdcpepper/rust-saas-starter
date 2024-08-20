@@ -4,6 +4,8 @@ use anyhow::Result;
 use axum::async_trait;
 use clap::Parser;
 use lettre::{
+    address::AddressError,
+    error::Error,
     message::MultiPart,
     transport::smtp::{
         authentication::Credentials,
@@ -13,7 +15,8 @@ use lettre::{
 };
 
 use crate::domain::communication::{
-    errors::EmailError, mailer::Mailer, value_objects::email_address::EmailAddress,
+    email_addresses::EmailAddress,
+    mailer::{Mailer, MailerError},
 };
 
 /// SMTP configuration
@@ -90,7 +93,7 @@ impl Mailer for SMTPMailer {
         subject: &str,
         html: &str,
         plain: &str,
-    ) -> Result<(), EmailError> {
+    ) -> Result<(), MailerError> {
         let email = Message::builder()
             .from(self.config.sender.parse()?)
             .to(to.to_string().parse()?)
@@ -102,7 +105,19 @@ impl Mailer for SMTPMailer {
 
         match self.mailer()?.send(&email) {
             Ok(_) => Ok(()),
-            Err(e) => Err(EmailError::UnknownError(e.into())),
+            Err(e) => Err(MailerError::UnknownError(e.into())),
         }
+    }
+}
+
+impl From<AddressError> for MailerError {
+    fn from(_err: AddressError) -> Self {
+        MailerError::InvalidEmail
+    }
+}
+
+impl From<Error> for MailerError {
+    fn from(err: Error) -> Self {
+        MailerError::UnknownError(err.into())
     }
 }

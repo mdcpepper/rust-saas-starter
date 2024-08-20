@@ -6,9 +6,9 @@ use uuid::Uuid;
 #[cfg(test)]
 use mockall::mock;
 
-use crate::domain::auth::{
+use crate::domain::auth::users::{
     errors::{CreateUserError, GetUserByIdError, UpdateUserError},
-    models::user::{NewUser, User},
+    NewUser, User,
 };
 
 /// User repository

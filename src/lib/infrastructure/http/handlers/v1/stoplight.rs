@@ -28,7 +28,7 @@ mod tests {
     use axum_test::TestServer;
     use testresult::TestResult;
 
-    use crate::infrastructure::http::{servers::https::router, state::test_state};
+    use crate::infrastructure::http::{servers::https::router, state::tests::test_state};
 
     #[tokio::test]
     async fn test_docs_handler() -> TestResult {

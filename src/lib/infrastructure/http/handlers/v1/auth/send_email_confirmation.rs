@@ -10,7 +10,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    domain::auth::services::{email_address::EmailAddressService, user::UserService},
+    domain::{auth::users::UserService, communication::email_addresses::EmailAddressService},
     infrastructure::http::{errors::ApiError, state::AppState},
 };
 
@@ -62,17 +62,13 @@ mod tests {
 
     use crate::{
         domain::{
-            auth::{
-                errors::GetUserByIdError,
-                models::user::User,
-                services::{email_address::MockEmailAddressService, user::MockUserService},
-            },
-            communication::value_objects::email_address::EmailAddress,
+            auth::users::{errors::GetUserByIdError, tests::MockUserService, User},
+            communication::email_addresses::{tests::MockEmailAddressService, EmailAddress},
         },
         infrastructure::http::{
             errors::ErrorResponse,
             handlers::v1::auth::send_email_confirmation::SendEmailConfirmationResponse,
-            servers::https::router, state::test_state,
+            servers::https::router, state::tests::test_state,
         },
     };
 

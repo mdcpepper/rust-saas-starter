@@ -6,7 +6,9 @@ use std::fmt;
 
 use chrono::{DateTime, Utc};
 
-use crate::domain::auth::services::{email_address::EmailAddressService, user::UserService};
+use crate::domain::{
+    auth::users::UserService, communication::email_addresses::EmailAddressService,
+};
 
 /// Application configuration
 #[derive(Clone, Debug)]
@@ -64,31 +66,35 @@ where
 }
 
 #[cfg(test)]
-use crate::domain::auth::services::{
-    email_address::MockEmailAddressService, user::MockUserService,
-};
-
-#[cfg(test)]
-pub fn test_state(
-    users: Option<MockUserService>,
-    email_addresses: Option<MockEmailAddressService>,
-) -> AppState<MockUserService, MockEmailAddressService> {
-    let users = users
-        .map(Arc::new)
-        .unwrap_or_else(|| Arc::new(MockUserService::new()));
-
-    let email_addresses = email_addresses
-        .map(Arc::new)
-        .unwrap_or_else(|| Arc::new(MockEmailAddressService::new()));
-
-    let config = AppConfig {
-        base_url: "https://example.com".to_string(),
+pub mod tests {
+    use crate::domain::{
+        auth::users::tests::MockUserService,
+        communication::email_addresses::tests::MockEmailAddressService,
     };
 
-    AppState {
-        start_time: Utc::now(),
-        config,
-        users,
-        email_addresses,
+    use super::*;
+
+    pub fn test_state(
+        users: Option<MockUserService>,
+        email_addresses: Option<MockEmailAddressService>,
+    ) -> AppState<MockUserService, MockEmailAddressService> {
+        let users = users
+            .map(Arc::new)
+            .unwrap_or_else(|| Arc::new(MockUserService::new()));
+
+        let email_addresses = email_addresses
+            .map(Arc::new)
+            .unwrap_or_else(|| Arc::new(MockEmailAddressService::new()));
+
+        let config = AppConfig {
+            base_url: "https://example.com".to_string(),
+        };
+
+        AppState {
+            start_time: Utc::now(),
+            config,
+            users,
+            email_addresses,
+        }
     }
 }

@@ -1,3 +1,3 @@
 //! Postgres Authentication module
 
-pub mod repositories;
+pub mod users;
