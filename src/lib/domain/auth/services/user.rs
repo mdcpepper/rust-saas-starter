@@ -22,7 +22,7 @@ use crate::domain::{
         models::user::{NewUser, User},
         repositories::user::UserRepository,
     },
-    comms::mailer::Mailer,
+    communication::mailer::Mailer,
 };
 
 /// User service
@@ -254,7 +254,7 @@ mod tests {
             models::user::NewUser, repositories::user::MockUserRepository,
             value_objects::password::Password,
         },
-        comms::{mailer::MockMailer, value_objects::email_address::EmailAddress},
+        communication::{mailer::MockMailer, value_objects::email_address::EmailAddress},
     };
 
     use super::*;

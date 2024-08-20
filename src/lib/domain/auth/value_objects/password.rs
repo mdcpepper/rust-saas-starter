@@ -54,6 +54,11 @@ impl Password {
         Ok(Self(raw.to_string()))
     }
 
+    /// Create a new password without checking it
+    pub fn new_unchecked(raw: &str) -> Self {
+        Self(raw.to_string())
+    }
+
     /// Get the password as a byte slice
     pub fn as_bytes(&self) -> &[u8] {
         self.0.as_bytes()

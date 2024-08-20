@@ -16,7 +16,7 @@ use crate::domain::{
         errors::{CreateUserError, EmailConfirmationError, GetUserByIdError},
         value_objects::password::PasswordError,
     },
-    comms::value_objects::email_address::EmailAddressError,
+    communication::value_objects::email_address::EmailAddressError,
 };
 
 /// An error response

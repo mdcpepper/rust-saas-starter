@@ -17,7 +17,7 @@ use crate::{
             models::user::{NewUser, User},
             repositories::user::UserRepository,
         },
-        comms::value_objects::email_address::EmailAddress,
+        communication::value_objects::email_address::EmailAddress,
     },
     infrastructure::db::postgres::PostgresDatabase,
 };

@@ -5,7 +5,8 @@ use password_auth::generate_hash;
 use uuid::Uuid;
 
 use crate::domain::{
-    auth::value_objects::password::Password, comms::value_objects::email_address::EmailAddress,
+    auth::value_objects::password::Password,
+    communication::value_objects::email_address::EmailAddress,
 };
 
 /// User model
@@ -100,7 +101,8 @@ mod tests {
     use uuid::Uuid;
 
     use crate::domain::{
-        auth::value_objects::password::Password, comms::value_objects::email_address::EmailAddress,
+        auth::value_objects::password::Password,
+        communication::value_objects::email_address::EmailAddress,
     };
 
     use super::NewUser;

@@ -14,7 +14,7 @@ use crate::{
         auth::{
             models::user::NewUser, services::user::UserService, value_objects::password::Password,
         },
-        comms::value_objects::email_address::EmailAddress,
+        communication::value_objects::email_address::EmailAddress,
     },
     infrastructure::http::{errors::ApiError, state::AppState},
 };
@@ -24,11 +24,11 @@ use crate::{
 pub struct CreateUserBody {
     /// The new user's email address
     #[schema(example = "email@example.com")]
-    email: String,
+    pub email: String,
 
     /// The new user's password
     #[schema(example = "correcthorsebatterystaple")]
-    password: String,
+    pub password: String,
 }
 
 impl TryFrom<CreateUserBody> for NewUser {
@@ -95,7 +95,7 @@ mod tests {
     use crate::{
         domain::{
             auth::{errors::CreateUserError, services::user::MockUserService},
-            comms::value_objects::email_address::EmailAddress,
+            communication::value_objects::email_address::EmailAddress,
         },
         infrastructure::http::{
             errors::ErrorResponse,

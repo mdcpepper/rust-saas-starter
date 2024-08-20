@@ -3,7 +3,9 @@
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::domain::comms::{errors::EmailError, value_objects::email_address::EmailAddress};
+use crate::domain::communication::{
+    errors::EmailError, value_objects::email_address::EmailAddress,
+};
 
 /// Errors that can occur when creating a user
 #[derive(Debug, Error)]

@@ -12,7 +12,7 @@ use lettre::{
     Message, SmtpTransport, Transport,
 };
 
-use crate::domain::comms::{
+use crate::domain::communication::{
     errors::EmailError, mailer::Mailer, value_objects::email_address::EmailAddress,
 };
 
@@ -40,8 +40,8 @@ pub struct SMTPConfig {
     pub sender: String,
 
     /// Verify the TLS certificate
-    #[clap(long, env = "SMTP_VERIFY_TLS", default_value = "true")]
-    pub verify_tls: bool,
+    #[clap(long, env = "SMTP_VERIFY_CERTS", default_value = "true")]
+    pub verify_certs: bool,
 
     /// Enable STARTTLS (TLS upgrade on connection)
     #[clap(long, env = "SMTP_STARTTLS", default_value = "true")]
@@ -75,7 +75,7 @@ impl SMTPMailer {
             .port(self.config.port)
             .tls(Tls::Opportunistic(
                 TlsParameters::builder(self.config.host.to_string())
-                    .dangerous_accept_invalid_certs(!self.config.verify_tls)
+                    .dangerous_accept_invalid_certs(!self.config.verify_certs)
                     .build()?,
             ))
             .build())

@@ -62,7 +62,7 @@ mod tests {
             auth::{
                 errors::EmailConfirmationError, models::user::User, services::user::MockUserService,
             },
-            comms::value_objects::email_address::EmailAddress,
+            communication::value_objects::email_address::EmailAddress,
         },
         infrastructure::http::{
             errors::ErrorResponse,
