@@ -16,15 +16,19 @@ pub mod v1;
 
 /// Catch panics and return a 500 error
 pub fn panic_handler(err: Box<dyn Any + Send + 'static>) -> Response<Body> {
-    let details = if let Some(s) = err.downcast_ref::<String>() {
-        s.clone()
-    } else if let Some(s) = err.downcast_ref::<&str>() {
-        s.to_string()
-    } else {
-        "Internal server error".to_string()
+    let details = match err.downcast_ref::<String>() {
+        Some(s) => s.clone(),
+        None => err
+            .downcast_ref::<&str>()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "Internal server error".to_string()),
     };
 
-    let error = ErrorResponse { error: details };
+    tracing::error!("Panic: {}", details);
+
+    let error = ErrorResponse {
+        error: "Internal server error".to_string(),
+    };
 
     let response = Json(error).into_response();
 
@@ -50,12 +54,15 @@ mod tests {
 
         let json = serde_json::from_str::<serde_json::Value>(&body_text).unwrap();
 
-        assert_eq!(json, serde_json::json!({ "error": "Something went wrong" }));
+        assert_eq!(
+            json,
+            serde_json::json!({ "error": "Internal server error" })
+        );
     }
 
     fn simulate_panic() -> Box<dyn std::any::Any + Send + 'static> {
         let result = panic::catch_unwind(AssertUnwindSafe(|| {
-            panic!("Something went wrong");
+            panic!("Panic message");
         }));
 
         if let Err(err) = result {
