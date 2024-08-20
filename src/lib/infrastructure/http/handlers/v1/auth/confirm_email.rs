@@ -1,14 +1,25 @@
 use axum::{
     extract::{Path, Query, State},
-    Json,
+    http::StatusCode,
+    response::IntoResponse,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    domain::auth::services::user::UserService,
-    infrastructure::http::{errors::ApiError, state::AppState},
+    domain::auth::{errors::EmailConfirmationError, services::user::UserService},
+    infrastructure::http::{
+        state::AppState,
+        templates::{
+            auth::email_confirmed::EmailConfirmedTemplate,
+            errors::{
+                internal_server_error::InternalServerErrorTemplate,
+                not_found::NotFoundErrorTemplate,
+                unprocessable_entity::UnprocessableEntityErrorTemplate,
+            },
+        },
+    },
 };
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -21,32 +32,32 @@ pub struct EmailConfirmedResponse {
     success: bool,
 }
 
-/// Confirm the email of a user
-#[utoipa::path(
-    get,
-    operation_id = "confirm_email",
-    tag = "Auth",
-    path = "/api/v1/users/{id}/email/confirmation",
-    params(
-        ("id" = Uuid, Path, description = "The UUID of the user", example = "550e8400-e29b-41d4-a716-446655440000"),
-        ("token" = String, Query, description = "The email confirmation token", example = "f9l4Cu5Mpwxu48ITlEfh3QNCgRrda_p23dtSx-ETfkY=")
-    ),
-    responses(
-        (status = StatusCode::OK, description = "Email confirmed", body = EmailConfirmedResponse),
-        (status = StatusCode::NOT_FOUND, description = "User not found", body = ErrorResponse, example = json!({ "error": "User with id \"550e8400-e29b-41d4-a716-446655440000\" not found" })),
-        (status = StatusCode::BAD_REQUEST, description = "Invalid token", body = ErrorResponse, example = json!({ "error": "Invalid email confirmation token" })),
-        (status = StatusCode::CONFLICT, description = "Email already confirmed", body = ErrorResponse, example = json!({ "error": "Email already confirmed" })),
-        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ErrorResponse, example = json!({ "error": "Failed to confirm email: <error>" })),
-    )
-)]
 pub async fn handler<U: UserService>(
     State(state): State<AppState<U>>,
     Path(user_id): Path<Uuid>,
     Query(query): Query<ConfirmEmailParams>,
-) -> Result<Json<EmailConfirmedResponse>, ApiError> {
-    state.users.confirm_email(&user_id, &query.token).await?;
-
-    Ok(Json(EmailConfirmedResponse { success: true }))
+) -> (StatusCode, impl IntoResponse) {
+    match state.users.confirm_email(&user_id, &query.token).await {
+        Ok(_) => (StatusCode::OK, EmailConfirmedTemplate.into_response()),
+        Err(err) => match err {
+            EmailConfirmationError::UserNotFound(_) => {
+                (StatusCode::NOT_FOUND, NotFoundErrorTemplate.into_response())
+            }
+            EmailConfirmationError::ConfirmationTokenExpired
+            | EmailConfirmationError::ConfirmationTokenMismatch => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                UnprocessableEntityErrorTemplate.into_response(),
+            ),
+            EmailConfirmationError::EmailAlreadyConfirmed => (
+                StatusCode::CONFLICT,
+                UnprocessableEntityErrorTemplate.into_response(),
+            ),
+            _ => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                InternalServerErrorTemplate.into_response(),
+            ),
+        },
+    }
 }
 
 #[cfg(test)]
@@ -58,10 +69,7 @@ mod tests {
 
     use crate::{
         domain::auth::{errors::EmailConfirmationError, services::user::MockUserService},
-        infrastructure::http::{
-            errors::ErrorResponse, handlers::v1::auth::confirm_email::EmailConfirmedResponse,
-            servers::https::router, state::test_state,
-        },
+        infrastructure::http::{servers::https::router, state::test_state},
     };
 
     #[tokio::test]
@@ -86,10 +94,8 @@ mod tests {
             .add_raw_query_param("token=test-token")
             .await;
 
-        let json = response.json::<EmailConfirmedResponse>();
-
-        assert_eq!(response.status_code(), StatusCode::OK);
-        assert_eq!(json.success, true);
+        response.assert_text_contains("Your email address has been confirmed.");
+        response.assert_status(StatusCode::OK);
 
         Ok(())
     }
@@ -116,13 +122,8 @@ mod tests {
             .add_query_param("token", "test-token")
             .await;
 
-        let json = response.json::<ErrorResponse>();
-
-        assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
-        assert_eq!(
-            json.error,
-            format!("User with id \"{}\" not found", user_id)
-        );
+        response.assert_status(StatusCode::NOT_FOUND);
+        response.assert_text_contains("Not found.");
 
         Ok(())
     }
@@ -149,10 +150,7 @@ mod tests {
             .add_query_param("token", "test-token")
             .await;
 
-        let json = response.json::<ErrorResponse>();
-
-        assert_eq!(response.status_code(), StatusCode::UNPROCESSABLE_ENTITY);
-        assert_eq!(json.error, "Confirmation token does not match");
+        response.assert_status(StatusCode::UNPROCESSABLE_ENTITY);
 
         Ok(())
     }
@@ -179,10 +177,7 @@ mod tests {
             .add_query_param("token", "test-token")
             .await;
 
-        let json = response.json::<ErrorResponse>();
-
-        assert_eq!(response.status_code(), StatusCode::CONFLICT);
-        assert_eq!(json.error, "Email is already confirmed");
+        response.assert_status(StatusCode::CONFLICT);
 
         Ok(())
     }

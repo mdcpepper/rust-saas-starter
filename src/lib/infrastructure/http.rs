@@ -14,6 +14,7 @@ mod handlers;
 mod open_api;
 pub mod servers;
 pub mod state;
+mod templates;
 
 /// Configuration for the HTTP server.
 #[derive(Debug, Clone, PartialEq, Eq, Parser)]
