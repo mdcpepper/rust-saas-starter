@@ -16,6 +16,9 @@ pub mod servers;
 pub mod state;
 mod templates;
 
+#[cfg(not(test))]
+mod rate_limit;
+
 /// Configuration for the HTTP server.
 #[derive(Debug, Clone, PartialEq, Eq, Parser)]
 pub struct HttpServerConfig {

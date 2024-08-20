@@ -25,7 +25,8 @@ pub struct UptimeResponse {
     tag = "System",
     path = "/api/v1/uptime",
     responses(
-        (status = 200, description = "Uptime response", body = UptimeResponse),
+        (status = StatusCode::OK, description = "Uptime response", body = UptimeResponse),
+        (status = StatusCode::TOO_MANY_REQUESTS, description = "Too many requests"),
     )
 )]
 pub async fn handler<U: UserService, E: EmailAddressService>(

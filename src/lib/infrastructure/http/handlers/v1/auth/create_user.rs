@@ -65,6 +65,7 @@ pub struct CreateUserResponse {
         (status = StatusCode::CREATED, description = "User created", body = CreateUserResponse),
         (status = StatusCode::UNPROCESSABLE_ENTITY, description = "Unprocessable entity", body = ErrorResponse),
         (status = StatusCode::CONFLICT, description = "User already exists", body = ErrorResponse, example = json!({"message": "User with email \"email@example.com\" aleady exists"})),
+        (status = StatusCode::TOO_MANY_REQUESTS, description = "Too many requests"),
     )
 )]
 pub async fn handler<U: UserService, E: EmailAddressService>(

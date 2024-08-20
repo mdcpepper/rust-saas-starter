@@ -5,7 +5,7 @@ use std::net::SocketAddr;
 use anyhow::{Context, Result};
 use axum::{async_trait, extract::Request, Router};
 use axum_server::{tls_rustls::RustlsConfig, Handle};
-use tower_http::trace::TraceLayer;
+use tower_http::{compression::CompressionLayer, trace::TraceLayer};
 use tracing::{debug, info, info_span};
 
 use crate::{
@@ -52,7 +52,10 @@ impl Server for HttpsServer {
 
         let server = axum_server::bind_rustls(self.address, self.tls_config)
             .handle(handle.clone())
-            .serve(self.router.into_make_service());
+            .serve(
+                self.router
+                    .into_make_service_with_connect_info::<SocketAddr>(),
+            );
 
         tokio::select! {
             result = server => result.context("server error")?,
@@ -72,8 +75,57 @@ pub fn router<U: UserService, E: EmailAddressService>(state: AppState<U, E>) -> 
         info_span!("http_request", method = ?request.method(), uri)
     });
 
-    Router::new()
+    #[allow(unused_mut)]
+    let mut router = Router::new()
         .layer(trace_layer)
         .nest("/api/v1", v1::router())
-        .with_state(state)
+        .layer(
+            CompressionLayer::new()
+                .br(true)
+                .deflate(true)
+                .gzip(true)
+                .zstd(true),
+        )
+        .with_state(state);
+
+    // Configure the rate limiting only if not compiling for tests
+    #[cfg(not(test))]
+    {
+        use crate::infrastructure::http::rate_limit::RateLimitConfig;
+        use std::{sync::Arc, time::Duration};
+        use tower_governor::{
+            governor::GovernorConfigBuilder, key_extractor::SmartIpKeyExtractor, GovernorLayer,
+        };
+
+        use crate::infrastructure::http::rate_limit::rate_limit_error_handler;
+
+        let rate_limit = RateLimitConfig::default();
+        let governor_conf = Arc::new(
+            GovernorConfigBuilder::default()
+                .key_extractor(SmartIpKeyExtractor)
+                .per_second(rate_limit.per_second)
+                .burst_size(rate_limit.burst_size)
+                .use_headers()
+                .error_handler(rate_limit_error_handler)
+                .finish()
+                .expect("failed to create governor config"),
+        );
+
+        let governor_limiter = governor_conf.limiter().clone();
+        let interval = Duration::from_secs(60);
+
+        std::thread::spawn(move || loop {
+            std::thread::sleep(interval);
+            tracing::info!("rate limiting storage size: {}", governor_limiter.len());
+            governor_limiter.retain_recent();
+        });
+
+        let governor_layer = GovernorLayer {
+            config: governor_conf,
+        };
+
+        router = router.layer(governor_layer);
+    }
+
+    router
 }

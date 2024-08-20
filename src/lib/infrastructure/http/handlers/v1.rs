@@ -4,7 +4,6 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use tower_http::compression::CompressionLayer;
 use utoipa::OpenApi;
 
 use crate::{
@@ -32,11 +31,4 @@ pub fn router<U: UserService, E: EmailAddressService>() -> Router<AppState<U, E>
             get(auth::confirm_email::handler),
         )
         .route("/users", post(auth::create_user::handler))
-        .layer(
-            CompressionLayer::new()
-                .br(true)
-                .deflate(true)
-                .gzip(true)
-                .zstd(true),
-        )
 }
