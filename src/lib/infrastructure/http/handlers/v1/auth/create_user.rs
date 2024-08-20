@@ -10,10 +10,13 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    domain::auth::{
-        models::user::NewUser,
-        services::user::UserService,
-        value_objects::{email_address::EmailAddress, password::Password},
+    domain::{
+        auth::{
+            models::user::NewUser,
+            services::{email_address::EmailAddressService, user::UserService},
+            value_objects::password::Password,
+        },
+        communication::value_objects::email_address::EmailAddress,
     },
     infrastructure::http::{errors::ApiError, state::AppState},
 };
@@ -23,11 +26,11 @@ use crate::{
 pub struct CreateUserBody {
     /// The new user's email address
     #[schema(example = "email@example.com")]
-    email: String,
+    pub email: String,
 
     /// The new user's password
     #[schema(example = "correcthorsebatterystaple")]
-    password: String,
+    pub password: String,
 }
 
 impl TryFrom<CreateUserBody> for NewUser {
@@ -36,8 +39,8 @@ impl TryFrom<CreateUserBody> for NewUser {
     fn try_from(body: CreateUserBody) -> Result<Self, Self::Error> {
         Ok(Self::new(
             Uuid::now_v7(),
-            EmailAddress::new(&body.email).map_err(ApiError::from)?,
-            Password::new(&body.password).map_err(ApiError::from)?,
+            EmailAddress::new(&body.email)?,
+            Password::new(&body.password)?,
         ))
     }
 }
@@ -64,19 +67,16 @@ pub struct CreateUserResponse {
         (status = StatusCode::CONFLICT, description = "User already exists", body = ErrorResponse, example = json!({"message": "User with email \"email@example.com\" aleady exists"})),
     )
 )]
-pub async fn handler<U: UserService>(
-    State(state): State<AppState<U>>,
+pub async fn handler<U: UserService, E: EmailAddressService>(
+    State(state): State<AppState<U, E>>,
     request: Result<Json<CreateUserBody>, JsonRejection>,
 ) -> Result<(StatusCode, Json<CreateUserResponse>), ApiError> {
-    let Json(request) = request.map_err(ApiError::from)?;
-
+    let Json(request) = request?;
     let email = request.email.clone();
 
-    let id = state
-        .users
-        .create_user(&request.try_into()?)
-        .await
-        .map_err(ApiError::from)?;
+    let new_user: NewUser = request.try_into()?;
+
+    let id = state.users.create_user(&new_user).await?;
 
     Ok((StatusCode::CREATED, Json(CreateUserResponse { id, email })))
 }
@@ -89,15 +89,15 @@ mod tests {
     use uuid::Uuid;
 
     use crate::{
-        domain::auth::{
-            errors::CreateUserError, services::user::MockUserService,
-            value_objects::email_address::EmailAddress,
+        domain::{
+            auth::{errors::CreateUserError, services::user::MockUserService},
+            communication::value_objects::email_address::EmailAddress,
         },
         infrastructure::http::{
             errors::ErrorResponse,
             handlers::v1::auth::create_user::{CreateUserBody, CreateUserResponse},
             servers::https::router,
-            state::AppState,
+            state::test_state,
         },
     };
 
@@ -124,7 +124,7 @@ mod tests {
             .withf(move |user| user.email() == &email)
             .returning(move |_| Ok(user_id.clone()));
 
-        let state = AppState::new(user_service);
+        let state = test_state(Some(user_service), None);
 
         let response = TestServer::new(router(state))?
             .post("/api/v1/users")
@@ -141,7 +141,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_user_email_error() -> TestResult {
-        let state = AppState::new(MockUserService::new());
+        let state = test_state(None, None);
 
         let response = TestServer::new(router(state))?
             .post("/api/v1/users")
@@ -161,7 +161,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_user_password_error() -> TestResult {
-        let state = AppState::new(MockUserService::new());
+        let state = test_state(None, None);
 
         let response = TestServer::new(router(state))?
             .post("/api/v1/users")
@@ -178,15 +178,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_user_duplicate_user() -> TestResult {
-        let mut user_service = MockUserService::new();
+        let mut users = MockUserService::new();
 
-        user_service.expect_create_user().returning(|_| {
+        users.expect_create_user().returning(|_| {
             Err(CreateUserError::DuplicateUser {
                 email: EmailAddress::new("email@example.com").expect("valid email"),
             })
         });
 
-        let state = AppState::new(user_service);
+        let state = test_state(Some(users), None);
 
         let response = TestServer::new(router(state))?
             .post("/api/v1/users")

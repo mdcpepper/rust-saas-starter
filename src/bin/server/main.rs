@@ -17,12 +17,13 @@ use anyhow::Result;
 use chrono::Utc;
 use clap::Parser;
 use rust_saas_starter::{
-    domain::auth::services::user::UserServiceImpl,
+    domain::auth::services::{email_address::EmailAddressServiceImpl, user::UserServiceImpl},
     infrastructure::{
         db::postgres::{DatabaseConnectionDetails, PostgresDatabase},
+        email::smtp::{SMTPConfig, SMTPMailer},
         http::{
             servers::{http::HttpServer, https::HttpsServer},
-            state::AppState,
+            state::{AppConfig, AppState},
             HttpServerConfig, Server,
         },
     },
@@ -38,11 +39,19 @@ pub struct Args {
     /// The database connection details
     #[clap(flatten)]
     pub db: DatabaseConnectionDetails,
+
+    /// SMTP server configuration
+    #[clap(flatten)]
+    pub smtp: SMTPConfig,
 }
 
 #[mutants::skip]
 #[tokio::main]
 async fn main() -> Result<()> {
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Failed to install rustls crypto provider");
+
     if let Err(e) = dotenvy::dotenv() {
         eprintln!("Failed to load environment: {}", e);
 
@@ -54,10 +63,17 @@ async fn main() -> Result<()> {
     let args = Args::parse();
 
     let postgres = Arc::new(PostgresDatabase::new(&args.db.connection_string).await?);
+    let mailer = Arc::new(SMTPMailer::new(args.smtp));
+
+    let config = AppConfig {
+        base_url: args.server.base_url.clone(),
+    };
 
     let state = AppState {
+        config,
         start_time: Utc::now(),
-        users: Arc::new(UserServiceImpl::new(postgres)),
+        users: Arc::new(UserServiceImpl::new(postgres.clone())),
+        email_addresses: Arc::new(EmailAddressServiceImpl::new(postgres, mailer)),
     };
 
     let http_port = args.server.http_port;

@@ -10,7 +10,10 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    domain::auth::{models::user::User, services::user::UserService},
+    domain::auth::{
+        models::user::User,
+        services::{email_address::EmailAddressService, user::UserService},
+    },
     infrastructure::http::{errors::ApiError, state::AppState},
 };
 
@@ -18,6 +21,7 @@ use crate::{
 pub struct GetUserByIdResponse {
     id: String,
     email: String,
+    email_confirmed_at: Option<DateTime<Utc>>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -25,10 +29,11 @@ pub struct GetUserByIdResponse {
 impl From<User> for GetUserByIdResponse {
     fn from(user: User) -> Self {
         Self {
-            id: user.id().to_string(),
-            email: user.email().to_string(),
-            created_at: *user.created_at(),
-            updated_at: *user.updated_at(),
+            id: user.id.to_string(),
+            email: user.email.to_string(),
+            email_confirmed_at: user.email_confirmed_at,
+            created_at: user.created_at,
+            updated_at: user.updated_at,
         }
     }
 }
@@ -48,13 +53,13 @@ impl From<User> for GetUserByIdResponse {
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ErrorResponse),
     )
 )]
-pub async fn handler<U: UserService>(
-    State(state): State<AppState<U>>,
+pub async fn handler<U: UserService, E: EmailAddressService>(
+    State(state): State<AppState<U, E>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<GetUserByIdResponse>, ApiError> {
-    let user = state.users.get_user_by_id(&id).await?;
+    let user = state.users.get_user_by_id(&id).await?.into();
 
-    Ok(Json(user.into()))
+    Ok(Json(user))
 }
 
 #[cfg(test)]
@@ -66,13 +71,13 @@ mod tests {
     use uuid::Uuid;
 
     use crate::{
-        domain::auth::{
-            errors::GetUserByIdError, models::user::User, services::user::MockUserService,
-            value_objects::email_address::EmailAddress,
+        domain::{
+            auth::{errors::GetUserByIdError, models::user::User, services::user::MockUserService},
+            communication::value_objects::email_address::EmailAddress,
         },
         infrastructure::http::{
             errors::ErrorResponse, handlers::v1::auth::get_user_by_id::GetUserByIdResponse,
-            servers::https::router, state::AppState,
+            servers::https::router, state::test_state,
         },
     };
 
@@ -82,18 +87,21 @@ mod tests {
         let user = User {
             id: user_id.clone(),
             email: EmailAddress::new_unchecked("email@example.com"),
+            email_confirmed_at: None,
+            email_confirmation_token: None,
+            email_confirmation_sent_at: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
 
-        let mut user_service = MockUserService::new();
+        let mut users = MockUserService::new();
 
-        user_service
+        users
             .expect_get_user_by_id()
             .withf(move |id| *id == user.id)
             .returning(move |_| Ok(user.clone()));
 
-        let state = AppState::new(user_service);
+        let state = test_state(Some(users), None);
 
         let response = TestServer::new(router(state))?
             .get(&format!("/api/v1/users/{}", user_id.clone()))
@@ -112,14 +120,14 @@ mod tests {
     async fn test_get_user_by_id_not_found() -> TestResult {
         let user_id = Uuid::now_v7();
         let expected_user_id = user_id.clone();
-        let mut user_service = MockUserService::new();
+        let mut users = MockUserService::new();
 
-        user_service
+        users
             .expect_get_user_by_id()
             .withf(move |id| *id == user_id)
             .returning(move |_| Err(GetUserByIdError::UserNotFound(user_id.clone())));
 
-        let state = AppState::new(user_service);
+        let state = test_state(Some(users), None);
 
         let response = TestServer::new(router(state))?
             .get(&format!("/api/v1/users/{user_id}"))

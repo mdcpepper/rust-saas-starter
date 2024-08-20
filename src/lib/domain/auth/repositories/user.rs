@@ -7,7 +7,7 @@ use uuid::Uuid;
 use mockall::mock;
 
 use crate::domain::auth::{
-    errors::{CreateUserError, GetUserByIdError},
+    errors::{CreateUserError, GetUserByIdError, UpdateUserError},
     models::user::{NewUser, User},
 };
 
@@ -19,6 +19,16 @@ pub trait UserRepository: Clone + Send + Sync + 'static {
 
     /// Get a user by their ID
     async fn get_user_by_id(&self, id: &Uuid) -> Result<User, GetUserByIdError>;
+
+    /// Update the email confirmation token for a user
+    async fn update_email_confirmation_token(
+        &self,
+        user_id: &Uuid,
+        token: &str,
+    ) -> Result<(), UpdateUserError>;
+
+    /// Update the email confirmed date for a user
+    async fn update_email_confirmed(&self, user_id: &Uuid) -> Result<(), UpdateUserError>;
 }
 
 #[cfg(test)]
@@ -33,5 +43,11 @@ mock! {
     impl UserRepository for UserRepository {
         async fn create_user(&self, req: &NewUser) -> Result<Uuid, CreateUserError>;
         async fn get_user_by_id(&self, id: &Uuid) -> Result<User, GetUserByIdError>;
+        async fn update_email_confirmation_token(
+            &self,
+            user_id: &Uuid,
+            token: &str,
+        ) -> Result<(), UpdateUserError>;
+        async fn update_email_confirmed(&self, user_id: &Uuid) -> Result<(), UpdateUserError>;
     }
 }

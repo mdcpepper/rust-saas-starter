@@ -1,7 +1,8 @@
-//! User service module.
+//! User service module
 
 use std::sync::Arc;
 
+use anyhow::Result;
 use async_trait::async_trait;
 use uuid::Uuid;
 
@@ -20,12 +21,12 @@ pub trait UserService: Clone + Send + Sync + 'static {
     /// Creates a new user based on the provided request details.
     ///
     /// # Arguments
-    /// * `req` - A reference to a [`CreateUserRequest`] containing the user details.
+    /// * `user` - A reference to a [`NewUser`] containing the user details.
     ///
     /// # Returns
     /// A [`Result`] which is [`Ok`] containing the user's UUID if the user is successfully created,
     /// or an [`Err`] containing a [`CreateUserError`] if the user cannot be created.
-    async fn create_user(&self, req: &NewUser) -> Result<Uuid, CreateUserError>;
+    async fn create_user(&self, user: &NewUser) -> Result<Uuid, CreateUserError>;
 
     /// Retrieves a user by their ID.
     ///
@@ -96,10 +97,12 @@ mod tests {
     use testresult::TestResult;
     use uuid::Uuid;
 
-    use crate::domain::auth::{
-        models::user::NewUser,
-        repositories::user::MockUserRepository,
-        value_objects::{email_address::EmailAddress, password::Password},
+    use crate::domain::{
+        auth::{
+            models::user::NewUser, repositories::user::MockUserRepository,
+            value_objects::password::Password,
+        },
+        communication::value_objects::email_address::EmailAddress,
     };
 
     use super::*;
@@ -107,25 +110,25 @@ mod tests {
     #[tokio::test]
     async fn test_create_user_success() -> TestResult {
         let user_id = Uuid::now_v7();
-        let request = NewUser::new(
+        let user = NewUser::new(
             user_id,
-            EmailAddress::new("email@example.com")?,
+            EmailAddress::new_unchecked("email@example.com"),
             Password::new("correcthorsebatterystaple")?,
         );
-        let expected_id = request.id().clone();
+        let expected_id = user.id().clone();
 
         let mut mock = MockUserRepository::new();
 
         mock.expect_create_user()
             .times(1)
-            .with(eq(request.clone()))
+            .with(eq(user.clone()))
             .returning(move |_| Ok(expected_id));
 
         let service = UserServiceImpl::new(Arc::new(mock));
 
-        let user_id = service.create_user(&request).await?;
+        let user_id = service.create_user(&user).await?;
 
-        assert_eq!(&user_id, request.id());
+        assert_eq!(&user_id, user.id());
 
         Ok(())
     }
@@ -133,18 +136,18 @@ mod tests {
     #[tokio::test]
     async fn test_create_user_already_exists() -> TestResult {
         let user_id = Uuid::now_v7();
-        let request = NewUser::new(
+        let user = NewUser::new(
             user_id,
-            EmailAddress::new("email@example.com")?,
+            EmailAddress::new_unchecked("email@example.com"),
             Password::new("correcthorsebatterystaple")?,
         );
-        let email = request.email().clone();
+        let email = user.email().clone();
 
         let mut mock = MockUserRepository::new();
 
         mock.expect_create_user()
             .times(1)
-            .with(eq(request.clone()))
+            .with(eq(user.clone()))
             .returning(move |_req| {
                 Err(CreateUserError::DuplicateUser {
                     email: email.clone(),
@@ -153,7 +156,7 @@ mod tests {
 
         let service = UserServiceImpl::new(Arc::new(mock));
 
-        let result = service.create_user(&request).await;
+        let result = service.create_user(&user).await;
 
         assert!(result.is_err());
         assert!(matches!(result, Err(CreateUserError::DuplicateUser { .. })));
@@ -164,9 +167,9 @@ mod tests {
     #[tokio::test]
     async fn test_create_user_unknown_error() -> TestResult {
         let user_id = Uuid::now_v7();
-        let request = NewUser::new(
+        let user = NewUser::new(
             user_id,
-            EmailAddress::new("email@example.com")?,
+            EmailAddress::new_unchecked("email@example.com"),
             Password::new("correcthorsebatterystaple")?,
         );
 
@@ -174,12 +177,12 @@ mod tests {
 
         mock.expect_create_user()
             .times(1)
-            .with(eq(request.clone()))
+            .with(eq(user.clone()))
             .returning(move |_req| Err(CreateUserError::UnknownError(anyhow!("Unknown error"))));
 
         let service = UserServiceImpl::new(Arc::new(mock));
 
-        let result = service.create_user(&request).await;
+        let result = service.create_user(&user).await;
 
         assert!(result.is_err());
         assert!(matches!(result, Err(CreateUserError::UnknownError { .. })));
@@ -194,20 +197,23 @@ mod tests {
         let user = User {
             id: user_id.clone(),
             email: EmailAddress::new_unchecked("mdcpepper@gmail.com"),
+            email_confirmed_at: None,
+            email_confirmation_token: None,
+            email_confirmation_sent_at: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
 
         let expected_user = user.clone();
 
-        let mut mock = MockUserRepository::new();
+        let mut repo = MockUserRepository::new();
 
-        mock.expect_get_user_by_id()
+        repo.expect_get_user_by_id()
             .times(1)
             .with(eq(user_id.clone()))
             .returning(move |_| Ok(user.clone()));
 
-        let service = UserServiceImpl::new(Arc::new(mock));
+        let service = UserServiceImpl::new(Arc::new(repo));
 
         let found_user = service.get_user_by_id(&user_id).await?;
 

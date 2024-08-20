@@ -56,3 +56,9 @@ cargo run --bin server
 The database can be viewed using Adminer, a lightweight database management tool that provides a web interface for interacting with the database.
 
 - Adminer URL: http://localhost:8888
+
+### Email Testing
+
+There is a local Mailtrap SMTP server for testing email sending. You can view the emails sent by the application by visiting the Roundcube web interface:
+
+- Roundcube URL: http://localhost:9080

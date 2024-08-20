@@ -9,7 +9,7 @@ use tower_http::trace::TraceLayer;
 use tracing::{debug, info, info_span};
 
 use crate::{
-    domain::auth::services::user::UserService,
+    domain::auth::services::{email_address::EmailAddressService, user::UserService},
     infrastructure::http::{handlers::v1, shutdown_signal, state::AppState, Server},
 };
 
@@ -27,7 +27,7 @@ impl HttpsServer {
         address: SocketAddr,
         cert_path: &str,
         key_path: &str,
-        state: AppState<impl UserService>,
+        state: AppState<impl UserService, impl EmailAddressService>,
     ) -> Result<Self> {
         let tls_config = RustlsConfig::from_pem_file(cert_path, key_path)
             .await
@@ -66,7 +66,7 @@ impl Server for HttpsServer {
 }
 
 /// Create the router for the HTTPS server
-pub fn router<US: UserService>(state: AppState<US>) -> Router {
+pub fn router<U: UserService, E: EmailAddressService>(state: AppState<U, E>) -> Router {
     let trace_layer = TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
         let uri = request.uri().to_string();
         info_span!("http_request", method = ?request.method(), uri)
