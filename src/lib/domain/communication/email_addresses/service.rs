@@ -17,8 +17,8 @@ use mockall::mock;
 
 use crate::domain::{
     auth::{
-        emails::confirm_email_address::ConfirmEmailAddressTemplate, errors::EmailConfirmationError,
-        models::user::User, repositories::user::UserRepository,
+        emails::confirm_email_address::ConfirmEmailAddressTemplate,
+        users::{errors::EmailConfirmationError, User, UserRepository},
     },
     communication::mailer::Mailer,
 };
@@ -180,9 +180,10 @@ mod tests {
     use testresult::TestResult;
 
     use crate::domain::{
-        auth::repositories::user::MockUserRepository,
+        auth::users::tests::MockUserRepository,
         communication::{
-            errors::EmailError, mailer::MockMailer, value_objects::email_address::EmailAddress,
+            email_addresses::EmailAddress,
+            mailer::{tests::MockMailer, MailerError},
         },
     };
 
@@ -264,7 +265,7 @@ mod tests {
         mailer
             .expect_send_email()
             .times(1)
-            .returning(|_, _, _, _| Err(EmailError::SendError));
+            .returning(|_, _, _, _| Err(MailerError::SendError));
 
         let service = EmailAddressServiceImpl::new(Arc::new(users), Arc::new(mailer));
 

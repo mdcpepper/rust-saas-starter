@@ -12,12 +12,11 @@ use uuid::Uuid;
 
 use crate::{
     domain::{
-        auth::{
+        auth::users::{
             errors::{CreateUserError, GetUserByIdError, UpdateUserError},
-            models::user::{NewUser, User},
-            repositories::user::UserRepository,
+            NewUser, User, UserRepository,
         },
-        communication::value_objects::email_address::EmailAddress,
+        communication::email_addresses::EmailAddress,
     },
     infrastructure::db::postgres::PostgresDatabase,
 };

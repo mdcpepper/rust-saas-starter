@@ -1,5 +1,4 @@
 //! Communication domain module
 
-pub mod errors;
+pub mod email_addresses;
 pub mod mailer;
-pub mod value_objects;

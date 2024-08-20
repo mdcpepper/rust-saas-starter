@@ -11,12 +11,8 @@ use uuid::Uuid;
 
 use crate::{
     domain::{
-        auth::{
-            models::user::NewUser,
-            services::{email_address::EmailAddressService, user::UserService},
-            value_objects::password::Password,
-        },
-        communication::value_objects::email_address::EmailAddress,
+        auth::users::{NewUser, Password, UserService},
+        communication::email_addresses::{EmailAddress, EmailAddressService},
     },
     infrastructure::http::{errors::ApiError, state::AppState},
 };
@@ -91,14 +87,14 @@ mod tests {
 
     use crate::{
         domain::{
-            auth::{errors::CreateUserError, services::user::MockUserService},
-            communication::value_objects::email_address::EmailAddress,
+            auth::users::{errors::CreateUserError, tests::MockUserService},
+            communication::email_addresses::EmailAddress,
         },
         infrastructure::http::{
             errors::ErrorResponse,
             handlers::v1::auth::create_user::{CreateUserBody, CreateUserResponse},
             servers::https::router,
-            state::test_state,
+            state::tests::test_state,
         },
     };
 

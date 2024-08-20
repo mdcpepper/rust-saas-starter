@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
-    domain::auth::services::{email_address::EmailAddressService, user::UserService},
+    domain::auth::users::UserService,
+    domain::communication::email_addresses::EmailAddressService,
     infrastructure::http::{errors::ApiError, state::AppState},
 };
 
@@ -44,7 +45,7 @@ mod tests {
     use testresult::TestResult;
 
     use crate::infrastructure::http::{
-        handlers::v1::uptime::UptimeResponse, servers::https::router, state::test_state,
+        handlers::v1::uptime::UptimeResponse, servers::https::router, state::tests::test_state,
     };
 
     #[tokio::test]

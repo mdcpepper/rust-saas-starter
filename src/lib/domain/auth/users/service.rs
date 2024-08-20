@@ -9,10 +9,9 @@ use uuid::Uuid;
 #[cfg(test)]
 use mockall::mock;
 
-use crate::domain::auth::{
+use crate::domain::auth::users::{
     errors::{CreateUserError, GetUserByIdError},
-    models::user::{NewUser, User},
-    repositories::user::UserRepository,
+    NewUser, User, UserRepository,
 };
 
 /// User service
@@ -98,11 +97,8 @@ mod tests {
     use uuid::Uuid;
 
     use crate::domain::{
-        auth::{
-            models::user::NewUser, repositories::user::MockUserRepository,
-            value_objects::password::Password,
-        },
-        communication::value_objects::email_address::EmailAddress,
+        auth::users::{tests::MockUserRepository, NewUser, Password},
+        communication::email_addresses::EmailAddress,
     };
 
     use super::*;

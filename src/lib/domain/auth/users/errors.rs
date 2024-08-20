@@ -4,9 +4,7 @@ use css_inline::InlineError;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::domain::communication::{
-    errors::EmailError, value_objects::email_address::EmailAddress,
-};
+use crate::domain::communication::{email_addresses::EmailAddress, mailer::MailerError};
 
 /// Errors that can occur when creating a user
 #[derive(Debug, Error)]
@@ -93,13 +91,13 @@ impl From<UpdateUserError> for EmailConfirmationError {
     }
 }
 
-impl From<EmailError> for EmailConfirmationError {
-    fn from(err: EmailError) -> Self {
+impl From<MailerError> for EmailConfirmationError {
+    fn from(err: MailerError) -> Self {
         match err {
-            EmailError::SendError | EmailError::InvalidEmail => {
+            MailerError::SendError | MailerError::InvalidEmail => {
                 EmailConfirmationError::CouldNotSendEmail
             }
-            EmailError::UnknownError(e) => EmailConfirmationError::UnknownError(e),
+            MailerError::UnknownError(e) => EmailConfirmationError::UnknownError(e),
         }
     }
 }

@@ -8,9 +8,12 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    domain::auth::{
-        errors::{EmailConfirmationError, GetUserByIdError},
-        services::{email_address::EmailAddressService, user::UserService},
+    domain::{
+        auth::users::{
+            errors::{EmailConfirmationError, GetUserByIdError},
+            UserService,
+        },
+        communication::email_addresses::EmailAddressService,
     },
     infrastructure::http::{
         state::AppState,
@@ -88,12 +91,11 @@ mod tests {
     use uuid::Uuid;
 
     use crate::{
-        domain::auth::{
-            errors::EmailConfirmationError,
-            models::user::User,
-            services::{email_address::MockEmailAddressService, user::MockUserService},
+        domain::{
+            auth::users::{errors::EmailConfirmationError, tests::MockUserService, User},
+            communication::email_addresses::tests::MockEmailAddressService,
         },
-        infrastructure::http::{servers::https::router, state::test_state},
+        infrastructure::http::{servers::https::router, state::tests::test_state},
     };
 
     #[tokio::test]

@@ -17,7 +17,9 @@ use anyhow::Result;
 use chrono::Utc;
 use clap::Parser;
 use rust_saas_starter::{
-    domain::auth::services::{email_address::EmailAddressServiceImpl, user::UserServiceImpl},
+    domain::{
+        auth::users::UserServiceImpl, communication::email_addresses::EmailAddressServiceImpl,
+    },
     infrastructure::{
         db::postgres::{DatabaseConnectionDetails, PostgresDatabase},
         email::smtp::{SMTPConfig, SMTPMailer},
