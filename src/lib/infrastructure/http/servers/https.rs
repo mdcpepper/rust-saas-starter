@@ -112,12 +112,14 @@ pub fn router<U: UserService, E: EmailAddressService>(state: AppState<U, E>) -> 
         );
 
         let governor_limiter = governor_conf.limiter().clone();
-        let interval = Duration::from_secs(60);
 
-        std::thread::spawn(move || loop {
-            std::thread::sleep(interval);
-            tracing::info!("rate limiting storage size: {}", governor_limiter.len());
-            governor_limiter.retain_recent();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(60));
+            loop {
+                interval.tick().await;
+                tracing::info!("rate limiting storage size: {}", governor_limiter.len());
+                governor_limiter.retain_recent();
+            }
         });
 
         let governor_layer = GovernorLayer {
