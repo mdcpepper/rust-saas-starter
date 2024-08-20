@@ -5,12 +5,17 @@ use std::net::SocketAddr;
 use anyhow::{Context, Result};
 use axum::{async_trait, extract::Request, Router};
 use axum_server::{tls_rustls::RustlsConfig, Handle};
-use tower_http::{compression::CompressionLayer, trace::TraceLayer};
+use tower_http::{catch_panic::CatchPanicLayer, compression::CompressionLayer, trace::TraceLayer};
 use tracing::{debug, info, info_span};
 
 use crate::{
     domain::auth::services::{email_address::EmailAddressService, user::UserService},
-    infrastructure::http::{handlers::v1, shutdown_signal, state::AppState, Server},
+    infrastructure::http::{
+        handlers::{panic_handler, v1},
+        shutdown_signal,
+        state::AppState,
+        Server,
+    },
 };
 
 /// The application's HTTPS server
@@ -86,7 +91,8 @@ pub fn router<U: UserService, E: EmailAddressService>(state: AppState<U, E>) -> 
                 .gzip(true)
                 .zstd(true),
         )
-        .with_state(state);
+        .with_state(state)
+        .layer(CatchPanicLayer::custom(panic_handler));
 
     // Configure the rate limiting only if not compiling for tests
     #[cfg(not(test))]

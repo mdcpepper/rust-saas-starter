@@ -3615,6 +3615,7 @@ dependencies = [
  "bitflags 2.6.0",
  "bytes",
  "futures-core",
+ "futures-util",
  "http 1.1.0",
  "http-body",
  "http-body-util",
