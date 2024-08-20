@@ -16,7 +16,7 @@ impl ConfirmEmailAddressTemplate {
     /// Creates a new `ConfirmEmailAddressTemplate`
     pub fn new(base_url: &str, user_id: &Uuid, token: &str) -> Self {
         Self {
-            link: format!("{base_url}/users/{user_id}/email/confirmation?token={token}"),
+            link: format!("{base_url}/api/v1/users/{user_id}/email/confirmation?token={token}"),
         }
     }
 
@@ -43,7 +43,7 @@ mod tests {
 
         assert_eq!(
             template.link,
-            format!("https://example.com/users/{user_id}/email/confirmation?token=f9l4Cu5Mpwxu48ITlEfh3QNCgRrda_p23dtSx-ETfkY=")
+            format!("https://example.com/api/v1/users/{user_id}/email/confirmation?token=f9l4Cu5Mpwxu48ITlEfh3QNCgRrda_p23dtSx-ETfkY=")
         );
     }
 }

@@ -42,6 +42,10 @@ pub struct SMTPConfig {
     /// Verify the TLS certificate
     #[clap(long, env = "SMTP_VERIFY_TLS", default_value = "true")]
     pub verify_tls: bool,
+
+    /// Enable STARTTLS (TLS upgrade on connection)
+    #[clap(long, env = "SMTP_STARTTLS", default_value = "true")]
+    pub starttls: bool,
 }
 
 /// SMTP mailer
@@ -60,7 +64,13 @@ impl SMTPMailer {
     pub fn mailer(&self) -> Result<SmtpTransport> {
         let creds = Credentials::new(self.config.username.clone(), self.config.password.clone());
 
-        Ok(SmtpTransport::relay(&self.config.host)?
+        let relay = if self.config.starttls {
+            SmtpTransport::starttls_relay(&self.config.host)?
+        } else {
+            SmtpTransport::relay(&self.config.host)?
+        };
+
+        Ok(relay
             .credentials(creds)
             .port(self.config.port)
             .tls(Tls::Opportunistic(
