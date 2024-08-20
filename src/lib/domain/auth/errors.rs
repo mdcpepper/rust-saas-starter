@@ -1,5 +1,6 @@
 //! Error types for users, authentication and authorization
 
+use css_inline::InlineError;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -100,6 +101,12 @@ impl From<EmailError> for EmailConfirmationError {
             }
             EmailError::UnknownError(e) => EmailConfirmationError::UnknownError(e),
         }
+    }
+}
+
+impl From<InlineError> for EmailConfirmationError {
+    fn from(_err: InlineError) -> Self {
+        EmailConfirmationError::CouldNotSendEmail
     }
 }
 

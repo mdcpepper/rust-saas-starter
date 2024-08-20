@@ -48,6 +48,10 @@ pub struct Args {
 #[mutants::skip]
 #[tokio::main]
 async fn main() -> Result<()> {
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Failed to install rustls crypto provider");
+
     if let Err(e) = dotenvy::dotenv() {
         eprintln!("Failed to load environment: {}", e);
 

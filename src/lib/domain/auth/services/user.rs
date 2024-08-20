@@ -188,7 +188,7 @@ where
         let (token, expires_at) = self.generate_email_confirmation_token(user_id).await?;
 
         let template = ConfirmEmailAddressTemplate::new(base_url, user_id, &token);
-        let html = template.render()?;
+        let html = css_inline::inline(&template.render()?)?;
         let plain = template.render_plain()?;
 
         self.mailer

@@ -1,0 +1,8 @@
+Third-Party Software Notices and Acknowledgments
+
+This project incorporates components from the following third-party software, which are licensed as described below:
+
+Mailgun HTML Email Templates
+Portions of this project include HTML email templates adapted from Mailgun, released under the MIT License.
+Copyright (c) 2014 Mailgun.
+The full text of the license is available at https://github.com/mailgun/transactional-email-templates/blob/master/LICENSE.

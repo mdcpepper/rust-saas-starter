@@ -22,15 +22,20 @@ base64 = "0.22.1"
 chrono = { version = "0.4.38", features = ["serde"] }
 clap = { version = "4.5.16", features = ["derive", "env"] }
 constant_time_eq = "0.3.0"
+css-inline = { version = "0.14.1", features = ["cli"] }
 dotenvy = "0.15.7"
 http-serde = "2.1.1"
 lazy_static = "1.5.0"
-lettre = { version = "0.11.7", features = ["smtp-transport", "tokio1-native-tls"] }
+lettre = { version = "0.11.7", features = [
+    "smtp-transport",
+    "tokio1-native-tls",
+] }
 mockall = "0.13.0"
 mutants = "0.0.3"
 password-auth = "1.0.0"
 rand = "0.8.5"
 regex = "1.10.6"
+rustls = { version = "0.23.12", features = ["ring"] }
 serde = { version = "1.0.208", features = ["serde_derive"] }
 serde_json = "1.0.125"
 sha2 = "0.10.8"
