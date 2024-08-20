@@ -53,6 +53,7 @@ thiserror = "1.0.63"
 tokio = { version = "1.39.2", features = ["full"] }
 tower-http = { version = "0.5.2", features = ["trace", "compression-full"] }
 tower-layer = "0.3.3"
+tower_governor = "0.4.2"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["tracing"] }
 utoipa = { version = "4.2.3", features = ["axum_extras", "chrono", "uuid"] }

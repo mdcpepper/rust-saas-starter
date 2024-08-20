@@ -51,6 +51,7 @@ impl From<User> for GetUserByIdResponse {
         (status = StatusCode::OK, description = "User found", body = GetUserByIdResponse),
         (status = StatusCode::NOT_FOUND, description = "User not found", body = ErrorResponse),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ErrorResponse),
+        (status = StatusCode::TOO_MANY_REQUESTS, description = "Too many requests"),
     )
 )]
 pub async fn handler<U: UserService, E: EmailAddressService>(

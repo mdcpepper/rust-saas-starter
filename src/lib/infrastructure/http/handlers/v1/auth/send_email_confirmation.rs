@@ -32,6 +32,7 @@ pub struct SendEmailConfirmationResponse {
         (status = StatusCode::ACCEPTED, description = "Email confirmation sent", body = SendEmailConfirmationResponse),
         (status = StatusCode::NOT_FOUND, description = "User not found", body = ErrorResponse, example = json!({ "error": "User with id \"550e8400-e29b-41d4-a716-446655440000\" not found" })),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ErrorResponse, example = json!({ "error": "Failed to send email confirmation: <error>" })),
+        (status = StatusCode::TOO_MANY_REQUESTS, description = "Too many requests"),
     )
 )]
 pub async fn handler<U: UserService, E: EmailAddressService>(
