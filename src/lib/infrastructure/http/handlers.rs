@@ -2,7 +2,6 @@
 
 use std::any::Any;
 
-// use askama_axum::IntoResponse;
 use axum::{
     body::Body,
     http::{Response, StatusCode},
