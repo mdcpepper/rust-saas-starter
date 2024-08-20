@@ -44,10 +44,11 @@ impl TryFrom<CreateUserBody> for NewUser {
 /// Create user response body
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateUserResponse {
+    #[schema(example = "497f6eca-6276-4993-bfeb-53cbbbba6f08")]
     id: Uuid,
 
-    #[schema(example = "email@example.com")]
-    email: String,
+    #[schema(example = "email@example.com", value_type = String)]
+    email: EmailAddress,
 }
 
 /// Create a new user
@@ -75,7 +76,13 @@ pub async fn handler<U: UserService, E: EmailAddressService>(
 
     let id = state.users.create_user(&new_user).await?;
 
-    Ok((StatusCode::CREATED, Json(CreateUserResponse { id, email })))
+    Ok((
+        StatusCode::CREATED,
+        Json(CreateUserResponse {
+            id,
+            email: EmailAddress::new_unchecked(&email),
+        }),
+    ))
 }
 
 #[cfg(test)]

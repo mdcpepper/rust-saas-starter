@@ -2,6 +2,7 @@
 
 use lazy_static::lazy_static;
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 
 lazy_static! {
     static ref EMAIL_REGEX: Regex = Regex::new(r"^[^@\s]*?@[^@\s]*?\.[^@\s]*$").unwrap();
@@ -26,7 +27,7 @@ pub enum EmailAddressError {
 }
 
 /// An email address
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EmailAddress(String);
 
 impl EmailAddress {

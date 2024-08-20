@@ -6,6 +6,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tower_governor::GovernorError;
+use utoipa::ToSchema;
 
 use super::errors::ApiError;
 
@@ -27,7 +28,7 @@ impl Default for RateLimitConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct TooManyRequestsResponse {
     pub retry_after: u64,
 }

@@ -11,13 +11,15 @@ use tracing::debug;
 
 mod errors;
 mod handlers;
-mod open_api;
 pub mod servers;
 pub mod state;
 mod templates;
 
 #[cfg(not(test))]
 mod rate_limit;
+
+#[cfg(not(test))]
+mod open_api;
 
 /// Configuration for the HTTP server.
 #[derive(Debug, Clone, PartialEq, Eq, Parser)]

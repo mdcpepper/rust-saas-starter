@@ -9,6 +9,7 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
+use tracing::error;
 use utoipa::ToSchema;
 
 use crate::domain::{
@@ -17,6 +18,11 @@ use crate::domain::{
         PasswordError,
     },
     communication::email_addresses::EmailAddressError,
+};
+
+use super::templates::errors::{
+    internal_server_error::InternalServerErrorTemplate, not_found::NotFoundErrorTemplate,
+    unprocessable_entity::UnprocessableEntityErrorTemplate,
 };
 
 /// An error response
@@ -95,6 +101,47 @@ impl IntoResponse for ApiError {
             }),
         )
             .into_response()
+    }
+}
+
+impl IntoResponse for EmailConfirmationError {
+    fn into_response(self) -> Response {
+        error!("Email confirmation error: {:?}", self);
+
+        match self {
+            EmailConfirmationError::UserNotFound(_) => {
+                (StatusCode::NOT_FOUND, NotFoundErrorTemplate.into_response())
+            }
+            EmailConfirmationError::ConfirmationTokenExpired
+            | EmailConfirmationError::ConfirmationTokenMismatch => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                UnprocessableEntityErrorTemplate.into_response(),
+            ),
+            EmailConfirmationError::EmailAlreadyConfirmed => (
+                StatusCode::CONFLICT,
+                UnprocessableEntityErrorTemplate.into_response(),
+            ),
+            _ => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                InternalServerErrorTemplate.into_response(),
+            ),
+        }
+        .into_response()
+    }
+}
+
+impl IntoResponse for GetUserByIdError {
+    fn into_response(self) -> Response {
+        match self {
+            GetUserByIdError::UserNotFound(_) => {
+                (StatusCode::NOT_FOUND, NotFoundErrorTemplate.into_response())
+            }
+            GetUserByIdError::UnknownError(_) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                InternalServerErrorTemplate.into_response(),
+            ),
+        }
+        .into_response()
     }
 }
 

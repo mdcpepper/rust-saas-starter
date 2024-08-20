@@ -193,6 +193,7 @@ mod tests {
         let user = User {
             id: user_id.clone(),
             email: EmailAddress::new_unchecked("mdcpepper@gmail.com"),
+            new_email: None,
             email_confirmed_at: None,
             email_confirmation_token: None,
             email_confirmation_sent_at: None,
