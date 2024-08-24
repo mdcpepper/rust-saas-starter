@@ -137,25 +137,20 @@ mod tests {
             EmailAddress::new_unchecked("email@example.com"),
             Password::new("correcthorsebatterystaple")?,
         );
-        let email = user.email().clone();
 
         let mut mock = MockUserRepository::new();
 
         mock.expect_create_user()
             .times(1)
             .with(eq(user.clone()))
-            .returning(move |_req| {
-                Err(CreateUserError::DuplicateUser {
-                    email: email.clone(),
-                })
-            });
+            .returning(move |_req| Err(CreateUserError::DuplicateUser));
 
         let service = UserServiceImpl::new(Arc::new(mock));
 
         let result = service.create_user(&user).await;
 
         assert!(result.is_err());
-        assert!(matches!(result, Err(CreateUserError::DuplicateUser { .. })));
+        assert!(matches!(result, Err(CreateUserError::DuplicateUser)));
 
         Ok(())
     }
@@ -228,14 +223,14 @@ mod tests {
         mock.expect_get_user_by_id()
             .times(1)
             .with(eq(user_id.clone()))
-            .returning(move |_| Err(GetUserByIdError::UserNotFound(user_id.clone())));
+            .returning(move |_| Err(GetUserByIdError::UserNotFound));
 
         let service = UserServiceImpl::new(Arc::new(mock));
 
         let result = service.get_user_by_id(&user_id).await;
 
         assert!(result.is_err());
-        assert!(matches!(result, Err(GetUserByIdError::UserNotFound(id)) if id == user_id));
+        assert!(matches!(result, Err(GetUserByIdError::UserNotFound)));
 
         Ok(())
     }

@@ -50,8 +50,10 @@ mod tests {
 
     use crate::{
         domain::{
-            auth::users::{errors::EmailConfirmationError, tests::MockUserService, User},
-            communication::email_addresses::tests::MockEmailAddressService,
+            auth::users::{tests::MockUserService, User},
+            communication::email_addresses::{
+                tests::MockEmailAddressService, EmailConfirmationError,
+            },
         },
         infrastructure::http::{servers::https::router, state::tests::test_state},
     };
@@ -114,7 +116,7 @@ mod tests {
             .expect_confirm_email()
             .times(1)
             .withf(move |user, token| *user == expected_user && token == "test-token")
-            .returning(move |_, _| Err(EmailConfirmationError::UserNotFound(user_id.clone())));
+            .returning(move |_, _| Err(EmailConfirmationError::UserNotFound));
 
         let state = test_state(Some(users), Some(email_addresses));
 

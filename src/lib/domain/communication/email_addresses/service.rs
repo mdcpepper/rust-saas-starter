@@ -18,12 +18,12 @@ use mockall::mock;
 use crate::domain::{
     auth::{
         emails::confirm_email_address::ConfirmEmailAddressTemplate,
-        users::{errors::EmailConfirmationError, User, UserRepository},
+        users::{User, UserRepository},
     },
     communication::mailer::Mailer,
 };
 
-use super::EmailAddress;
+use super::{errors::EmailConfirmationError, EmailAddress};
 
 /// The type of email confirmation
 #[derive(Debug, PartialEq, Eq)]
@@ -120,7 +120,7 @@ where
         &self,
         user_id: &Uuid,
         new_email: Option<&EmailAddress>,
-    ) -> Result<(String, DateTime<Utc>)> {
+    ) -> Result<(String, DateTime<Utc>), EmailConfirmationError> {
         let salt: String = rand::thread_rng()
             .sample_iter(&Alphanumeric)
             .take(64)
@@ -134,7 +134,7 @@ where
         let token = URL_SAFE.encode(hash_result);
 
         self.user_repo
-            .update_email_confirmation_token(user_id, &token, new_email)
+            .initialize_email_confirmation(user_id, &token, new_email)
             .await?;
 
         Ok((token, Utc::now() + Duration::hours(24)))
@@ -153,7 +153,9 @@ where
         confirmation_type: EmailConfirmationType,
         base_url: &str,
     ) -> Result<DateTime<Utc>, EmailConfirmationError> {
-        if user.email_confirmed_at.is_some() && user.new_email.is_none() {
+        if user.email_confirmed_at.is_some()
+            && confirmation_type == EmailConfirmationType::CurrentEmail
+        {
             return Err(EmailConfirmationError::EmailAlreadyConfirmed);
         }
 
@@ -202,7 +204,7 @@ where
         }
 
         self.user_repo
-            .update_email_confirmed(&user.id, user.new_email.as_ref())
+            .complete_email_confirmation(&user.id, user.new_email.as_ref())
             .await?;
 
         Ok(())
@@ -214,7 +216,7 @@ mod tests {
     use testresult::TestResult;
 
     use crate::domain::{
-        auth::users::tests::MockUserRepository,
+        auth::users::{errors::UpdateUserError, tests::MockUserRepository},
         communication::{
             email_addresses::EmailAddress,
             mailer::{tests::MockMailer, MailerError},
@@ -229,7 +231,7 @@ mod tests {
 
         let mut repo = MockUserRepository::new();
 
-        repo.expect_update_email_confirmation_token()
+        repo.expect_initialize_email_confirmation()
             .times(1)
             .returning(move |_, _, _| Ok(()));
 
@@ -265,7 +267,7 @@ mod tests {
         let expected_user = user.clone();
 
         users
-            .expect_update_email_confirmation_token()
+            .expect_initialize_email_confirmation()
             .times(1)
             .returning(move |_, _, _| Ok(()));
 
@@ -299,7 +301,7 @@ mod tests {
         let mut mailer = MockMailer::new();
 
         users
-            .expect_update_email_confirmation_token()
+            .expect_initialize_email_confirmation()
             .times(1)
             .returning(|_, _, _| Ok(()));
 
@@ -314,6 +316,35 @@ mod tests {
             .send_email_confirmation(
                 &user,
                 EmailConfirmationType::CurrentEmail,
+                "https://localhost:3443",
+            )
+            .await;
+
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_confirmation_email_already_used() -> TestResult {
+        let user = User::default();
+
+        let mut user_repository = MockUserRepository::new();
+        let mut mailer = MockMailer::new();
+
+        user_repository
+            .expect_initialize_email_confirmation()
+            .times(1)
+            .returning(|_, _, _| Err(UpdateUserError::EmailAddressInUse));
+
+        mailer.expect_send_email().times(0);
+
+        let service = EmailAddressServiceImpl::new(Arc::new(user_repository), Arc::new(mailer));
+
+        let result = service
+            .send_email_confirmation(
+                &user,
+                EmailConfirmationType::NewEmail(EmailAddress::new_unchecked("email@example.com")),
                 "https://localhost:3443",
             )
             .await;
@@ -344,7 +375,7 @@ mod tests {
         let expected_user = user.clone();
 
         users
-            .expect_update_email_confirmed()
+            .expect_complete_email_confirmation()
             .times(1)
             .withf(move |user_id, new_email| *user_id == user.id && new_email.is_none())
             .returning(|_, _| Ok(()));
@@ -378,7 +409,7 @@ mod tests {
 
         let expected_user = user.clone();
 
-        users.expect_update_email_confirmed().times(0);
+        users.expect_complete_email_confirmation().times(0);
 
         let service = EmailAddressServiceImpl::new(Arc::new(users), Arc::new(MockMailer::new()));
 
@@ -411,7 +442,7 @@ mod tests {
 
         let expected_user = user.clone();
 
-        users.expect_update_email_confirmed().times(0);
+        users.expect_complete_email_confirmation().times(0);
 
         let service = EmailAddressServiceImpl::new(Arc::new(users), Arc::new(MockMailer::new()));
 

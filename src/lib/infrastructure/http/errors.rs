@@ -9,15 +9,15 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
-use tracing::error;
+use tracing::{debug, error};
 use utoipa::ToSchema;
 
 use crate::domain::{
     auth::users::{
-        errors::{CreateUserError, EmailConfirmationError, GetUserByIdError},
+        errors::{CreateUserError, GetUserByIdError, UpdateUserError},
         PasswordError,
     },
-    communication::email_addresses::EmailAddressError,
+    communication::email_addresses::{EmailAddressError, EmailConfirmationError},
 };
 
 use super::templates::errors::{
@@ -106,10 +106,8 @@ impl IntoResponse for ApiError {
 
 impl IntoResponse for EmailConfirmationError {
     fn into_response(self) -> Response {
-        error!("Email confirmation error: {:?}", self);
-
         match self {
-            EmailConfirmationError::UserNotFound(_) => {
+            EmailConfirmationError::UserNotFound => {
                 (StatusCode::NOT_FOUND, NotFoundErrorTemplate.into_response())
             }
             EmailConfirmationError::ConfirmationTokenExpired
@@ -133,7 +131,7 @@ impl IntoResponse for EmailConfirmationError {
 impl IntoResponse for GetUserByIdError {
     fn into_response(self) -> Response {
         match self {
-            GetUserByIdError::UserNotFound(_) => {
+            GetUserByIdError::UserNotFound => {
                 (StatusCode::NOT_FOUND, NotFoundErrorTemplate.into_response())
             }
             GetUserByIdError::UnknownError(_) => (
@@ -147,6 +145,8 @@ impl IntoResponse for GetUserByIdError {
 
 impl From<anyhow::Error> for ApiError {
     fn from(err: anyhow::Error) -> Self {
+        debug!("anyhow::Error -> ApiError");
+
         ApiError {
             status: StatusCode::INTERNAL_SERVER_ERROR,
             message: err.to_string(),
@@ -156,6 +156,8 @@ impl From<anyhow::Error> for ApiError {
 
 impl From<EmailAddressError> for ApiError {
     fn from(err: EmailAddressError) -> Self {
+        debug!("EmailAddressError -> ApiError");
+
         match err {
             EmailAddressError::EmptyEmailAddress => {
                 ApiError::new_422("Please provide an email address")
@@ -169,10 +171,10 @@ impl From<EmailAddressError> for ApiError {
 
 impl From<EmailConfirmationError> for ApiError {
     fn from(err: EmailConfirmationError) -> Self {
+        debug!("EmailConfirmationError {:#?} -> ApiError", err);
+
         match err {
-            EmailConfirmationError::UserNotFound(id) => {
-                ApiError::new_404(&format!("User with id \"{id}\" not found"))
-            }
+            EmailConfirmationError::UserNotFound => ApiError::new_404(&format!("User not found")),
             EmailConfirmationError::CouldNotSendEmail => {
                 ApiError::new_500("Could not send email confirmation email")
             }
@@ -185,6 +187,9 @@ impl From<EmailConfirmationError> for ApiError {
             EmailConfirmationError::ConfirmationTokenMismatch => {
                 ApiError::new_422("Confirmation token does not match")
             }
+            EmailConfirmationError::EmailAddressInUse => {
+                ApiError::new_409("Email is already in use")
+            }
             EmailConfirmationError::UnknownError(err) => unknown_error(Some(err.to_string())),
         }
     }
@@ -192,6 +197,8 @@ impl From<EmailConfirmationError> for ApiError {
 
 impl From<PasswordError> for ApiError {
     fn from(err: PasswordError) -> Self {
+        debug!("PasswordError -> ApiError");
+
         match err {
             PasswordError::TooShort => {
                 ApiError::new_422("Password must be at least 8 characters long")
@@ -208,21 +215,35 @@ impl From<PasswordError> for ApiError {
 
 impl From<CreateUserError> for ApiError {
     fn from(err: CreateUserError) -> Self {
+        debug!("CreateUserError -> ApiError");
+
         match err {
-            CreateUserError::DuplicateUser { email } => {
-                ApiError::new_409(&format!("User with email \"{email}\" already exists"))
+            CreateUserError::DuplicateUser => {
+                ApiError::new_409("User already exists with that email address")
             }
             CreateUserError::UnknownError(err) => unknown_error(Some(err.to_string())),
         }
     }
 }
 
+impl From<UpdateUserError> for ApiError {
+    fn from(err: UpdateUserError) -> Self {
+        debug!("UpdateUserError -> ApiError");
+
+        match err {
+            UpdateUserError::UserNotFound => ApiError::new_404(&format!("User not found")),
+            UpdateUserError::UnknownError(err) => unknown_error(Some(err.to_string())),
+            UpdateUserError::EmailAddressInUse => ApiError::new_409("Email is already in use"),
+        }
+    }
+}
+
 impl From<GetUserByIdError> for ApiError {
     fn from(err: GetUserByIdError) -> Self {
+        debug!("GetUserByIdError -> ApiError");
+
         match err {
-            GetUserByIdError::UserNotFound(id) => {
-                ApiError::new_404(&format!("User with id \"{id}\" not found"))
-            }
+            GetUserByIdError::UserNotFound => ApiError::new_404(&format!("User not found")),
             GetUserByIdError::UnknownError(err) => unknown_error(Some(err.to_string())),
         }
     }
@@ -230,17 +251,16 @@ impl From<GetUserByIdError> for ApiError {
 
 impl From<JsonRejection> for ApiError {
     fn from(rejection: JsonRejection) -> Self {
+        debug!("JsonRejection -> ApiError");
+
         ApiError::new(rejection.status(), &rejection.body_text())
     }
 }
 
 fn unknown_error(message: Option<String>) -> ApiError {
-    // TODO: Just log the message and return the generic one
-    if let Some(message) = message {
-        ApiError::new_500(&message)
-    } else {
-        ApiError::new_500("An unknown error occurred, please try again")
-    }
+    error!("Unknown error: {:?}", message);
+
+    ApiError::new_500("An unknown error occurred, please try again")
 }
 
 #[cfg(test)]

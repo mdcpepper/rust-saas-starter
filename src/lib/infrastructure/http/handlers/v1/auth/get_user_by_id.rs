@@ -124,13 +124,12 @@ mod tests {
     #[tokio::test]
     async fn test_get_user_by_id_not_found() -> TestResult {
         let user_id = Uuid::now_v7();
-        let expected_user_id = user_id.clone();
         let mut users = MockUserService::new();
 
         users
             .expect_get_user_by_id()
             .withf(move |id| *id == user_id)
-            .returning(move |_| Err(GetUserByIdError::UserNotFound(user_id.clone())));
+            .returning(move |_| Err(GetUserByIdError::UserNotFound));
 
         let state = test_state(Some(users), None);
 
@@ -141,10 +140,7 @@ mod tests {
         let json = response.json::<ErrorResponse>();
 
         assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
-        assert_eq!(
-            json.error,
-            format!("User with id \"{expected_user_id}\" not found")
-        );
+        assert_eq!(json.error, format!("User not found"));
 
         Ok(())
     }

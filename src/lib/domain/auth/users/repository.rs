@@ -24,7 +24,7 @@ pub trait UserRepository: Clone + Send + Sync + 'static {
     async fn get_user_by_id(&self, id: &Uuid) -> Result<User, GetUserByIdError>;
 
     /// Update the email confirmation token for a user
-    async fn update_email_confirmation_token<'a>(
+    async fn initialize_email_confirmation<'a>(
         &self,
         user_id: &Uuid,
         token: &str,
@@ -32,7 +32,7 @@ pub trait UserRepository: Clone + Send + Sync + 'static {
     ) -> Result<(), UpdateUserError>;
 
     /// Update the email confirmed date for a user
-    async fn update_email_confirmed<'a>(
+    async fn complete_email_confirmation<'a>(
         &self,
         user_id: &Uuid,
         new_email: Option<&'a EmailAddress>,
@@ -51,12 +51,12 @@ mock! {
     impl UserRepository for UserRepository {
         async fn create_user(&self, user: &NewUser) -> Result<Uuid, CreateUserError>;
         async fn get_user_by_id(&self, id: &Uuid) -> Result<User, GetUserByIdError>;
-        async fn update_email_confirmation_token<'a>(
+        async fn initialize_email_confirmation<'a>(
             &self,
             user_id: &Uuid,
             token: &str,
             new_email: Option<&'a EmailAddress>,
         ) -> Result<(), UpdateUserError>;
-        async fn update_email_confirmed<'a>(&self, user_id: &Uuid, new_email: Option<&'a EmailAddress>) -> Result<(), UpdateUserError>;
+        async fn complete_email_confirmation<'a>(&self, user_id: &Uuid, new_email: Option<&'a EmailAddress>) -> Result<(), UpdateUserError>;
     }
 }

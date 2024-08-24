@@ -62,7 +62,7 @@ pub struct CreateUserResponse {
         (status = StatusCode::CREATED, description = "User created", body = CreateUserResponse),
         (status = StatusCode::UNPROCESSABLE_ENTITY, description = "Unprocessable entity", body = ErrorResponse),
         (status = StatusCode::CONFLICT, description = "User already exists", body = ErrorResponse, example = json!({"message": "User with email \"email@example.com\" aleady exists"})),
-        (status = StatusCode::TOO_MANY_REQUESTS, description = "Too many requests"),
+        (status = StatusCode::TOO_MANY_REQUESTS, description = "Too many requests", body = TooManyRequestsResponse),
     )
 )]
 pub async fn handler<U: UserService, E: EmailAddressService>(
@@ -184,11 +184,9 @@ mod tests {
     async fn test_create_user_duplicate_user() -> TestResult {
         let mut users = MockUserService::new();
 
-        users.expect_create_user().returning(|_| {
-            Err(CreateUserError::DuplicateUser {
-                email: EmailAddress::new("email@example.com").expect("valid email"),
-            })
-        });
+        users
+            .expect_create_user()
+            .returning(|_| Err(CreateUserError::DuplicateUser));
 
         let state = test_state(Some(users), None);
 
@@ -203,10 +201,7 @@ mod tests {
         let json = response.json::<ErrorResponse>();
 
         assert_eq!(response.status_code(), StatusCode::CONFLICT);
-        assert_eq!(
-            json.error,
-            "User with email \"email@example.com\" already exists"
-        );
+        assert_eq!(json.error, "User already exists with that email address");
 
         Ok(())
     }

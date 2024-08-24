@@ -3,11 +3,7 @@
 use anyhow::{anyhow, Error};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use sqlx::{
-    error::ErrorKind::UniqueViolation,
-    query, query_as,
-    Error::{Database, RowNotFound},
-};
+use sqlx::{query, query_as, Error::RowNotFound};
 use uuid::Uuid;
 
 use crate::{
@@ -66,16 +62,7 @@ impl UserRepository for PostgresDatabase {
             user.password_hash().to_string()
         )
         .fetch_one(&self.pool)
-        .await
-        .map_err(|err| match err {
-            Database(db_err) => match db_err.kind() {
-                UniqueViolation => CreateUserError::DuplicateUser {
-                    email: user.email().clone(),
-                },
-                _ => CreateUserError::UnknownError(anyhow!("Unknown database error: {:?}", db_err)),
-            },
-            _ => CreateUserError::UnknownError(anyhow!("Unknown database error: {:?}", err)),
-        })?;
+        .await?;
 
         Ok(result.id)
     }
@@ -102,20 +89,44 @@ impl UserRepository for PostgresDatabase {
         .fetch_one(&self.pool)
         .await
         .map_err(|err| match err {
-            RowNotFound => GetUserByIdError::UserNotFound(*id),
+            RowNotFound => GetUserByIdError::UserNotFound,
             _ => GetUserByIdError::UnknownError(anyhow!("Unknown database error: {:?}", err)),
         })?
         .try_into()?)
     }
 
     #[mutants::skip]
-    async fn update_email_confirmation_token<'a>(
+    async fn initialize_email_confirmation<'a>(
         &self,
         user_id: &Uuid,
         token: &str,
         new_email: Option<&'a EmailAddress>,
     ) -> Result<(), UpdateUserError> {
-        let new_email = new_email.as_ref().map(|email| email.to_string());
+        let new_email: Option<String> = new_email.as_ref().map(|email| email.to_string());
+
+        let mut tx = self.pool.begin().await?;
+
+        if new_email.is_some() {
+            let existing_email = query!(
+                r#"
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM users
+                    WHERE email = $1
+                )
+                "#,
+                new_email,
+            )
+            .fetch_optional(&mut *tx)
+            .await?;
+
+            if existing_email
+                .map(|row| row.exists.unwrap_or(false))
+                .unwrap_or(false)
+            {
+                return Err(UpdateUserError::EmailAddressInUse);
+            }
+        }
 
         query!(
             r#"
@@ -129,18 +140,16 @@ impl UserRepository for PostgresDatabase {
             user_id,
             new_email,
         )
-        .execute(&self.pool)
-        .await
-        .map_err(|err| match err {
-            RowNotFound => UpdateUserError::UserNotFound(*user_id),
-            _ => UpdateUserError::UnknownError(anyhow!("Unknown database error: {:?}", err)),
-        })?;
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
 
         Ok(())
     }
 
     #[mutants::skip]
-    async fn update_email_confirmed<'a>(
+    async fn complete_email_confirmation<'a>(
         &self,
         user_id: &Uuid,
         new_email: Option<&'a EmailAddress>,
@@ -160,7 +169,7 @@ impl UserRepository for PostgresDatabase {
         .execute(&self.pool)
         .await
         .map_err(|err| match err {
-            RowNotFound => UpdateUserError::UserNotFound(*user_id),
+            RowNotFound => UpdateUserError::UserNotFound,
             _ => UpdateUserError::UnknownError(anyhow!("Unknown database error: {:?}", err)),
         })?;
 

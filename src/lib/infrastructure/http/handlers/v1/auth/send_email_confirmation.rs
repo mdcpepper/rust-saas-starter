@@ -141,7 +141,7 @@ mod tests {
         users
             .expect_get_user_by_id()
             .withf(move |id| *id == user_id)
-            .returning(move |_| Err(GetUserByIdError::UserNotFound(user_id)));
+            .returning(move |_| Err(GetUserByIdError::UserNotFound));
 
         email_addresses.expect_send_email_confirmation().times(0);
 
@@ -157,10 +157,7 @@ mod tests {
         let json = response.json::<ErrorResponse>();
 
         assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
-        assert_eq!(
-            json.error,
-            format!("User with id \"{}\" not found", user_id)
-        );
+        assert_eq!(json.error, "User not found");
 
         Ok(())
     }
