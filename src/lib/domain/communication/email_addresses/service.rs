@@ -18,10 +18,32 @@ use mockall::mock;
 use crate::domain::{
     auth::{
         emails::confirm_email_address::ConfirmEmailAddressTemplate,
-        users::{errors::EmailConfirmationError, User, UserRepository},
+        users::{User, UserRepository},
     },
     communication::mailer::Mailer,
 };
+
+use super::{errors::EmailConfirmationError, EmailAddress};
+
+/// The type of email confirmation
+#[derive(Debug, PartialEq, Eq)]
+pub enum EmailConfirmationType {
+    /// The user is confirming their current email address
+    CurrentEmail,
+
+    /// The user is confirming a new email address
+    NewEmail(EmailAddress),
+}
+
+impl EmailConfirmationType {
+    /// Gets the subject of the email confirmation
+    pub fn subject(&self) -> &str {
+        match self {
+            Self::CurrentEmail => "Please confirm your email address",
+            Self::NewEmail(_) => "Please confirm your new email address",
+        }
+    }
+}
 
 /// Email address service
 #[async_trait]
@@ -29,7 +51,8 @@ pub trait EmailAddressService: Clone + Send + Sync + 'static {
     /// Sends an email confirmation to the user.
     ///
     /// # Arguments
-    /// * `id` - The UUID of the user to send the email confirmation to.
+    /// * `user` - The user to send the email confirmation to.
+    /// * `base_url` - The base URL of the application.
     ///
     /// # Returns
     /// - [`Ok`] with a [`DateTime<Utc>`] representing the token's expiration time if successful.
@@ -37,6 +60,7 @@ pub trait EmailAddressService: Clone + Send + Sync + 'static {
     async fn send_email_confirmation(
         &self,
         user: &User,
+        confirmation_type: EmailConfirmationType,
         base_url: &str,
     ) -> Result<DateTime<Utc>, EmailConfirmationError>;
 
@@ -61,7 +85,12 @@ mock! {
 
     #[async_trait]
     impl EmailAddressService for EmailAddressService {
-        async fn send_email_confirmation(&self, user: &User, base_url: &str) -> Result<DateTime<Utc>, EmailConfirmationError>;
+        async fn send_email_confirmation(
+            &self,
+            user: &User,
+            confirmation_type: EmailConfirmationType,
+            base_url: &str,
+        ) -> Result<DateTime<Utc>, EmailConfirmationError>;
         async fn confirm_email(&self, user: &User, token: &str) -> Result<(), EmailConfirmationError>;
     }
 }
@@ -90,7 +119,8 @@ where
     async fn generate_email_confirmation_token(
         &self,
         user_id: &Uuid,
-    ) -> Result<(String, DateTime<Utc>)> {
+        new_email: Option<&EmailAddress>,
+    ) -> Result<(String, DateTime<Utc>), EmailConfirmationError> {
         let salt: String = rand::thread_rng()
             .sample_iter(&Alphanumeric)
             .take(64)
@@ -104,7 +134,7 @@ where
         let token = URL_SAFE.encode(hash_result);
 
         self.user_repo
-            .update_email_confirmation_token(user_id, &token)
+            .initialize_email_confirmation(user_id, &token, new_email)
             .await?;
 
         Ok((token, Utc::now() + Duration::hours(24)))
@@ -120,32 +150,37 @@ where
     async fn send_email_confirmation(
         &self,
         user: &User,
+        confirmation_type: EmailConfirmationType,
         base_url: &str,
     ) -> Result<DateTime<Utc>, EmailConfirmationError> {
-        if user.email_confirmed_at.is_some() {
+        if user.email_confirmed_at.is_some()
+            && confirmation_type == EmailConfirmationType::CurrentEmail
+        {
             return Err(EmailConfirmationError::EmailAlreadyConfirmed);
         }
 
-        let (token, expires_at) = self.generate_email_confirmation_token(&user.id).await?;
+        let (new_email, recipient) = match &confirmation_type {
+            EmailConfirmationType::CurrentEmail => (None, &user.email),
+            EmailConfirmationType::NewEmail(email) => (Some(email), email),
+        };
+
+        let (token, expires_at) = self
+            .generate_email_confirmation_token(&user.id, new_email)
+            .await?;
 
         let template = ConfirmEmailAddressTemplate::new(base_url, &user.id, &token);
         let html = css_inline::inline(&template.render()?)?;
         let plain = template.render_plain()?;
 
         self.mailer
-            .send_email(
-                &user.email,
-                "Please confirm your email address",
-                &html,
-                &plain,
-            )
+            .send_email(recipient, confirmation_type.subject(), &html, &plain)
             .await?;
 
         Ok(expires_at)
     }
 
     async fn confirm_email(&self, user: &User, token: &str) -> Result<(), EmailConfirmationError> {
-        if user.email_confirmed_at.is_some() {
+        if user.email_confirmed_at.is_some() && user.new_email.is_none() {
             return Err(EmailConfirmationError::EmailAlreadyConfirmed);
         }
 
@@ -168,7 +203,9 @@ where
             return Err(EmailConfirmationError::ConfirmationTokenMismatch);
         }
 
-        self.user_repo.update_email_confirmed(&user.id).await?;
+        self.user_repo
+            .complete_email_confirmation(&user.id, user.new_email.as_ref())
+            .await?;
 
         Ok(())
     }
@@ -176,11 +213,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use mockall::predicate::eq;
     use testresult::TestResult;
 
     use crate::domain::{
-        auth::users::tests::MockUserRepository,
+        auth::users::{errors::UpdateUserError, tests::MockUserRepository},
         communication::{
             email_addresses::EmailAddress,
             mailer::{tests::MockMailer, MailerError},
@@ -195,13 +231,15 @@ mod tests {
 
         let mut repo = MockUserRepository::new();
 
-        repo.expect_update_email_confirmation_token()
+        repo.expect_initialize_email_confirmation()
             .times(1)
-            .returning(move |_, _| Ok(()));
+            .returning(move |_, _, _| Ok(()));
 
         let service = EmailAddressServiceImpl::new(Arc::new(repo), Arc::new(MockMailer::new()));
 
-        let (token, expires_at) = service.generate_email_confirmation_token(&user_id).await?;
+        let (token, expires_at) = service
+            .generate_email_confirmation_token(&user_id, None)
+            .await?;
 
         assert_eq!(44, token.len());
         assert!(expires_at > Utc::now());
@@ -218,6 +256,7 @@ mod tests {
         let user = User {
             id: user_id.clone(),
             email: EmailAddress::new_unchecked("email@example.com"),
+            new_email: None,
             email_confirmed_at: None,
             email_confirmation_token: None,
             email_confirmation_sent_at: None,
@@ -228,9 +267,9 @@ mod tests {
         let expected_user = user.clone();
 
         users
-            .expect_update_email_confirmation_token()
+            .expect_initialize_email_confirmation()
             .times(1)
-            .returning(move |_, _| Ok(()));
+            .returning(move |_, _, _| Ok(()));
 
         let mut mailer = MockMailer::new();
 
@@ -242,7 +281,11 @@ mod tests {
         let service = EmailAddressServiceImpl::new(Arc::new(users), Arc::new(mailer));
 
         let expires_at = service
-            .send_email_confirmation(&expected_user, "https://localhost:3443")
+            .send_email_confirmation(
+                &expected_user,
+                EmailConfirmationType::CurrentEmail,
+                "https://localhost:3443",
+            )
             .await?;
 
         assert!(expires_at > Utc::now());
@@ -258,9 +301,9 @@ mod tests {
         let mut mailer = MockMailer::new();
 
         users
-            .expect_update_email_confirmation_token()
+            .expect_initialize_email_confirmation()
             .times(1)
-            .returning(|_, _| Ok(()));
+            .returning(|_, _, _| Ok(()));
 
         mailer
             .expect_send_email()
@@ -270,7 +313,40 @@ mod tests {
         let service = EmailAddressServiceImpl::new(Arc::new(users), Arc::new(mailer));
 
         let result = service
-            .send_email_confirmation(&user, "https://localhost:3443")
+            .send_email_confirmation(
+                &user,
+                EmailConfirmationType::CurrentEmail,
+                "https://localhost:3443",
+            )
+            .await;
+
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_confirmation_email_already_used() -> TestResult {
+        let user = User::default();
+
+        let mut user_repository = MockUserRepository::new();
+        let mut mailer = MockMailer::new();
+
+        user_repository
+            .expect_initialize_email_confirmation()
+            .times(1)
+            .returning(|_, _, _| Err(UpdateUserError::EmailAddressInUse));
+
+        mailer.expect_send_email().times(0);
+
+        let service = EmailAddressServiceImpl::new(Arc::new(user_repository), Arc::new(mailer));
+
+        let result = service
+            .send_email_confirmation(
+                &user,
+                EmailConfirmationType::NewEmail(EmailAddress::new_unchecked("email@example.com")),
+                "https://localhost:3443",
+            )
             .await;
 
         assert!(result.is_err());
@@ -288,6 +364,7 @@ mod tests {
         let user = User {
             id: user_id.clone(),
             email: EmailAddress::new_unchecked("email@example.com"),
+            new_email: None,
             email_confirmed_at: None,
             email_confirmation_token: Some("token".to_string()),
             email_confirmation_sent_at: Some(yesterday.clone() + Duration::hours(12)),
@@ -298,10 +375,10 @@ mod tests {
         let expected_user = user.clone();
 
         users
-            .expect_update_email_confirmed()
+            .expect_complete_email_confirmation()
             .times(1)
-            .with(eq(user_id.clone()))
-            .returning(|_| Ok(()));
+            .withf(move |user_id, new_email| *user_id == user.id && new_email.is_none())
+            .returning(|_, _| Ok(()));
 
         let service = EmailAddressServiceImpl::new(Arc::new(users), Arc::new(MockMailer::new()));
 
@@ -322,6 +399,7 @@ mod tests {
         let user = User {
             id: user_id.clone(),
             email: EmailAddress::new_unchecked("email@example.com"),
+            new_email: None,
             email_confirmed_at: None,
             email_confirmation_token: Some("token".to_string()),
             email_confirmation_sent_at: Some(yesterday.clone()),
@@ -331,7 +409,7 @@ mod tests {
 
         let expected_user = user.clone();
 
-        users.expect_update_email_confirmed().times(0);
+        users.expect_complete_email_confirmation().times(0);
 
         let service = EmailAddressServiceImpl::new(Arc::new(users), Arc::new(MockMailer::new()));
 
@@ -354,6 +432,7 @@ mod tests {
         let user = User {
             id: user_id.clone(),
             email: EmailAddress::new_unchecked("email@example.com"),
+            new_email: None,
             email_confirmed_at: None,
             email_confirmation_token: Some("token".to_string()),
             email_confirmation_sent_at: Some(last_week.clone()),
@@ -363,7 +442,7 @@ mod tests {
 
         let expected_user = user.clone();
 
-        users.expect_update_email_confirmed().times(0);
+        users.expect_complete_email_confirmation().times(0);
 
         let service = EmailAddressServiceImpl::new(Arc::new(users), Arc::new(MockMailer::new()));
 

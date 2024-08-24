@@ -1,20 +1,15 @@
 //! Error types for users, authentication and authorization
 
-use css_inline::InlineError;
+use anyhow::anyhow;
 use thiserror::Error;
-use uuid::Uuid;
-
-use crate::domain::communication::{email_addresses::EmailAddress, mailer::MailerError};
+use tracing::debug;
 
 /// Errors that can occur when creating a user
 #[derive(Debug, Error)]
 pub enum CreateUserError {
     /// User with email already exists
-    #[error("user with email {email} already exists")]
-    DuplicateUser {
-        /// Email address
-        email: EmailAddress,
-    },
+    #[error("User already exists with that email address")]
+    DuplicateUser,
 
     /// Unknown error
     #[error(transparent)]
@@ -25,36 +20,8 @@ pub enum CreateUserError {
 #[derive(Debug, Error)]
 pub enum GetUserByIdError {
     /// User not found
-    #[error("user with id \"{0}\" not found")]
-    UserNotFound(Uuid),
-
-    /// Unknown error
-    #[error(transparent)]
-    UnknownError(#[from] anyhow::Error),
-}
-
-/// Errors that can occur when sending or verifying an email confirmation
-#[derive(Debug, Error)]
-pub enum EmailConfirmationError {
-    /// User not found
-    #[error("user with id \"{0}\" not found")]
-    UserNotFound(Uuid),
-
-    /// Could not send confirmation email
-    #[error("could not send confirmation email")]
-    CouldNotSendEmail,
-
-    /// Email is already confirmed
-    #[error("email is already confirmed")]
-    EmailAlreadyConfirmed,
-
-    /// Confirmation token expired
-    #[error("confirmation token expired")]
-    ConfirmationTokenExpired,
-
-    /// Confirmation token mismatch
-    #[error("confirmation token mismatch")]
-    ConfirmationTokenMismatch,
+    #[error("User not found")]
+    UserNotFound,
 
     /// Unknown error
     #[error(transparent)]
@@ -65,51 +32,37 @@ pub enum EmailConfirmationError {
 #[derive(Debug, Error)]
 pub enum UpdateUserError {
     /// User not found
-    #[error("user with id \"{0}\" not found")]
-    UserNotFound(Uuid),
+    #[error("User not found")]
+    UserNotFound,
+
+    /// Email address already in use
+    #[error("User's email is already in use")]
+    EmailAddressInUse,
 
     /// Unknown error
     #[error(transparent)]
     UnknownError(#[from] anyhow::Error),
 }
 
-impl From<GetUserByIdError> for EmailConfirmationError {
-    fn from(err: GetUserByIdError) -> Self {
+impl From<sqlx::Error> for CreateUserError {
+    fn from(err: sqlx::Error) -> Self {
+        debug!("sqlxError: {:?}", err);
+
         match err {
-            GetUserByIdError::UserNotFound(id) => EmailConfirmationError::UserNotFound(id),
-            GetUserByIdError::UnknownError(e) => EmailConfirmationError::UnknownError(e),
+            sqlx::Error::Database(db_err) => match db_err.kind() {
+                sqlx::error::ErrorKind::UniqueViolation => CreateUserError::DuplicateUser,
+                _ => CreateUserError::UnknownError(anyhow!("Unknown database error: {:?}", db_err)),
+            },
+            _ => CreateUserError::UnknownError(anyhow!("Unknown database error: {:?}", err)),
         }
     }
 }
 
-impl From<UpdateUserError> for EmailConfirmationError {
-    fn from(err: UpdateUserError) -> Self {
+impl From<sqlx::Error> for UpdateUserError {
+    fn from(err: sqlx::Error) -> Self {
         match err {
-            UpdateUserError::UserNotFound(id) => EmailConfirmationError::UserNotFound(id),
-            UpdateUserError::UnknownError(e) => EmailConfirmationError::UnknownError(e),
+            sqlx::Error::RowNotFound => UpdateUserError::UserNotFound,
+            _ => UpdateUserError::UnknownError(err.into()),
         }
-    }
-}
-
-impl From<MailerError> for EmailConfirmationError {
-    fn from(err: MailerError) -> Self {
-        match err {
-            MailerError::SendError | MailerError::InvalidEmail => {
-                EmailConfirmationError::CouldNotSendEmail
-            }
-            MailerError::UnknownError(e) => EmailConfirmationError::UnknownError(e),
-        }
-    }
-}
-
-impl From<InlineError> for EmailConfirmationError {
-    fn from(_err: InlineError) -> Self {
-        EmailConfirmationError::CouldNotSendEmail
-    }
-}
-
-impl From<askama::Error> for EmailConfirmationError {
-    fn from(_err: askama::Error) -> Self {
-        EmailConfirmationError::CouldNotSendEmail
     }
 }

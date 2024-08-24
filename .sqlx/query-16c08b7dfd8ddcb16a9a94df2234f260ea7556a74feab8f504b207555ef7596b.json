@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE users\n            SET email_confirmation_token = $1,\n            email_confirmation_sent_at = NOW(),\n            new_email = COALESCE($3, new_email)\n            WHERE id = $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Uuid",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "16c08b7dfd8ddcb16a9a94df2234f260ea7556a74feab8f504b207555ef7596b"
+}

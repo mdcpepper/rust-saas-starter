@@ -15,6 +15,9 @@ pub struct User {
     /// User email address
     pub email: EmailAddress,
 
+    /// New user email address, if it is being updated
+    pub new_email: Option<EmailAddress>,
+
     /// User email confirmed at date in UTC
     pub email_confirmed_at: Option<DateTime<Utc>>,
 

@@ -19,7 +19,10 @@ use crate::{
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct GetUserByIdResponse {
-    id: String,
+    #[schema(example = "497f6eca-6276-4993-bfeb-53cbbbba6f08")]
+    id: Uuid,
+
+    #[schema(example = "email@example.com")]
     email: String,
     email_confirmed_at: Option<DateTime<Utc>>,
     created_at: DateTime<Utc>,
@@ -29,7 +32,7 @@ pub struct GetUserByIdResponse {
 impl From<User> for GetUserByIdResponse {
     fn from(user: User) -> Self {
         Self {
-            id: user.id.to_string(),
+            id: user.id,
             email: user.email.to_string(),
             email_confirmed_at: user.email_confirmed_at,
             created_at: user.created_at,
@@ -51,7 +54,7 @@ impl From<User> for GetUserByIdResponse {
         (status = StatusCode::OK, description = "User found", body = GetUserByIdResponse),
         (status = StatusCode::NOT_FOUND, description = "User not found", body = ErrorResponse),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ErrorResponse),
-        (status = StatusCode::TOO_MANY_REQUESTS, description = "Too many requests"),
+        (status = StatusCode::TOO_MANY_REQUESTS, description = "Too many requests", body = TooManyRequestsResponse),
     )
 )]
 pub async fn handler<U: UserService, E: EmailAddressService>(
@@ -88,6 +91,7 @@ mod tests {
         let user = User {
             id: user_id.clone(),
             email: EmailAddress::new_unchecked("email@example.com"),
+            new_email: None,
             email_confirmed_at: None,
             email_confirmation_token: None,
             email_confirmation_sent_at: None,
@@ -120,13 +124,12 @@ mod tests {
     #[tokio::test]
     async fn test_get_user_by_id_not_found() -> TestResult {
         let user_id = Uuid::now_v7();
-        let expected_user_id = user_id.clone();
         let mut users = MockUserService::new();
 
         users
             .expect_get_user_by_id()
             .withf(move |id| *id == user_id)
-            .returning(move |_| Err(GetUserByIdError::UserNotFound(user_id.clone())));
+            .returning(move |_| Err(GetUserByIdError::UserNotFound));
 
         let state = test_state(Some(users), None);
 
@@ -137,10 +140,7 @@ mod tests {
         let json = response.json::<ErrorResponse>();
 
         assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
-        assert_eq!(
-            json.error,
-            format!("User with id \"{expected_user_id}\" not found")
-        );
+        assert_eq!(json.error, format!("User not found"));
 
         Ok(())
     }

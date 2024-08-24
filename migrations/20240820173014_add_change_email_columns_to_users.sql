@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN new_email VARCHAR(255) NULL;

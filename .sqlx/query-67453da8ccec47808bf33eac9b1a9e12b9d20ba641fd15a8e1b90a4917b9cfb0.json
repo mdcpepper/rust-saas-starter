@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                id,\n                email,\n                email_confirmed_at,\n                email_confirmation_token,\n                email_confirmation_sent_at,\n                created_at,\n                updated_at\n            FROM users\n            WHERE id = $1\n            ",
+  "query": "\n            SELECT\n                id,\n                email,\n                new_email,\n                email_confirmed_at,\n                email_confirmation_token,\n                email_confirmation_sent_at,\n                created_at,\n                updated_at\n            FROM users\n            WHERE id = $1\n            ",
   "describe": {
     "columns": [
       {
@@ -15,26 +15,31 @@
       },
       {
         "ordinal": 2,
+        "name": "new_email",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
         "name": "email_confirmed_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "email_confirmation_token",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "email_confirmation_sent_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
@@ -50,9 +55,10 @@
       true,
       true,
       true,
+      true,
       false,
       false
     ]
   },
-  "hash": "f01102f6001340bbc432718712dd1251a6af2950d882aa81fa3947910819e34c"
+  "hash": "67453da8ccec47808bf33eac9b1a9e12b9d20ba641fd15a8e1b90a4917b9cfb0"
 }

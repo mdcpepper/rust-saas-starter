@@ -1,30 +1,17 @@
+use anyhow::Result;
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
-    response::IntoResponse,
+    response::{ErrorResponse, IntoResponse},
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    domain::{
-        auth::users::{
-            errors::{EmailConfirmationError, GetUserByIdError},
-            UserService,
-        },
-        communication::email_addresses::EmailAddressService,
-    },
+    domain::{auth::users::UserService, communication::email_addresses::EmailAddressService},
     infrastructure::http::{
-        state::AppState,
-        templates::{
-            auth::email_confirmed::EmailConfirmedTemplate,
-            errors::{
-                internal_server_error::InternalServerErrorTemplate,
-                not_found::NotFoundErrorTemplate,
-                unprocessable_entity::UnprocessableEntityErrorTemplate,
-            },
-        },
+        state::AppState, templates::auth::email_confirmed::EmailConfirmedTemplate,
     },
 };
 
@@ -38,49 +25,20 @@ pub struct EmailConfirmedResponse {
     success: bool,
 }
 
+/// Confirm a user's email address
 pub async fn handler<U: UserService, E: EmailAddressService>(
     State(state): State<AppState<U, E>>,
     Path(user_id): Path<Uuid>,
     Query(query): Query<ConfirmEmailParams>,
-) -> (StatusCode, impl IntoResponse) {
-    let user = state.users.get_user_by_id(&user_id).await;
+) -> Result<impl IntoResponse, ErrorResponse> {
+    let user = state.users.get_user_by_id(&user_id).await?;
 
-    match user {
-        Ok(user) => match state
-            .email_addresses
-            .confirm_email(&user, &query.token)
-            .await
-        {
-            Ok(_) => (StatusCode::OK, EmailConfirmedTemplate.into_response()),
-            Err(err) => match err {
-                EmailConfirmationError::UserNotFound(_) => {
-                    (StatusCode::NOT_FOUND, NotFoundErrorTemplate.into_response())
-                }
-                EmailConfirmationError::ConfirmationTokenExpired
-                | EmailConfirmationError::ConfirmationTokenMismatch => (
-                    StatusCode::UNPROCESSABLE_ENTITY,
-                    UnprocessableEntityErrorTemplate.into_response(),
-                ),
-                EmailConfirmationError::EmailAlreadyConfirmed => (
-                    StatusCode::CONFLICT,
-                    UnprocessableEntityErrorTemplate.into_response(),
-                ),
-                _ => (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    InternalServerErrorTemplate.into_response(),
-                ),
-            },
-        },
-        Err(err) => match err {
-            GetUserByIdError::UserNotFound(_) => {
-                (StatusCode::NOT_FOUND, NotFoundErrorTemplate.into_response())
-            }
-            GetUserByIdError::UnknownError(_) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                InternalServerErrorTemplate.into_response(),
-            ),
-        },
-    }
+    state
+        .email_addresses
+        .confirm_email(&user, &query.token)
+        .await?;
+
+    Ok((StatusCode::OK, EmailConfirmedTemplate))
 }
 
 #[cfg(test)]
@@ -92,8 +50,10 @@ mod tests {
 
     use crate::{
         domain::{
-            auth::users::{errors::EmailConfirmationError, tests::MockUserService, User},
-            communication::email_addresses::tests::MockEmailAddressService,
+            auth::users::{tests::MockUserService, User},
+            communication::email_addresses::{
+                tests::MockEmailAddressService, EmailConfirmationError,
+            },
         },
         infrastructure::http::{servers::https::router, state::tests::test_state},
     };
@@ -156,7 +116,7 @@ mod tests {
             .expect_confirm_email()
             .times(1)
             .withf(move |user, token| *user == expected_user && token == "test-token")
-            .returning(move |_, _| Err(EmailConfirmationError::UserNotFound(user_id.clone())));
+            .returning(move |_, _| Err(EmailConfirmationError::UserNotFound));
 
         let state = test_state(Some(users), Some(email_addresses));
 
