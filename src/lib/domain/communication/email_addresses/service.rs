@@ -20,7 +20,7 @@ use crate::domain::{
         emails::confirm_email_address::ConfirmEmailAddressTemplate,
         users::{User, UserRepository},
     },
-    communication::mailer::Mailer,
+    communication::mailer::{Mailer, Message},
 };
 
 use super::{errors::EmailConfirmationError, EmailAddress};
@@ -160,8 +160,8 @@ where
         }
 
         let (new_email, recipient) = match &confirmation_type {
-            EmailConfirmationType::CurrentEmail => (None, &user.email),
-            EmailConfirmationType::NewEmail(email) => (Some(email), email),
+            EmailConfirmationType::CurrentEmail => (None, user.email.clone()),
+            EmailConfirmationType::NewEmail(email) => (Some(email), email.clone()),
         };
 
         let (token, expires_at) = self
@@ -169,12 +169,16 @@ where
             .await?;
 
         let template = ConfirmEmailAddressTemplate::new(base_url, &user.id, &token);
-        let html = css_inline::inline(&template.render()?)?;
-        let plain = template.render_plain()?;
 
-        self.mailer
-            .send_email(recipient, confirmation_type.subject(), &html, &plain)
-            .await?;
+        let message = Message {
+            to: recipient,
+            from: None,
+            subject: confirmation_type.subject().to_string(),
+            html_body: css_inline::inline(&template.render()?)?,
+            plain_body: template.render_plain()?,
+        };
+
+        self.mailer.send_email(message).await?;
 
         Ok(expires_at)
     }
@@ -276,7 +280,7 @@ mod tests {
         mailer
             .expect_send_email()
             .times(1)
-            .returning(move |_, _, _, _| Ok(()));
+            .returning(move |_| Ok(()));
 
         let service = EmailAddressServiceImpl::new(Arc::new(users), Arc::new(mailer));
 
@@ -308,7 +312,7 @@ mod tests {
         mailer
             .expect_send_email()
             .times(1)
-            .returning(|_, _, _, _| Err(MailerError::SendError));
+            .returning(|_| Err(MailerError::SendError));
 
         let service = EmailAddressServiceImpl::new(Arc::new(users), Arc::new(mailer));
 
