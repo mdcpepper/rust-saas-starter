@@ -1,13 +1,12 @@
 //! Mailer module
 
 mod errors;
+mod message;
 
-pub use errors::MailerError;
+pub use {errors::MailerError, message::Message};
 
 use async_trait::async_trait;
 use mockall::mock;
-
-use crate::domain::communication::email_addresses::EmailAddress;
 
 /// Mailer trait
 #[async_trait]
@@ -23,13 +22,7 @@ pub trait Mailer: Clone + Send + Sync + 'static {
     ///
     /// # Returns
     /// A [`Result`] indicating success or failure.
-    async fn send_email(
-        &self,
-        to: &EmailAddress,
-        subject: &str,
-        html: &str,
-        plain: &str,
-    ) -> Result<(), MailerError>;
+    async fn send_email(&self, message: Message) -> Result<(), MailerError>;
 }
 
 mock! {
@@ -41,7 +34,7 @@ mock! {
 
     #[async_trait]
     impl Mailer for Mailer {
-        async fn send_email(&self, to: &EmailAddress, subject: &str, html: &str, plain: &str) -> Result<(), MailerError>;
+        async fn send_email(&self, message: Message) -> Result<(), MailerError>;
     }
 }
 

@@ -11,13 +11,10 @@ use lettre::{
         authentication::Credentials,
         client::{Tls, TlsParameters},
     },
-    Message, SmtpTransport, Transport,
+    SmtpTransport, Transport,
 };
 
-use crate::domain::communication::{
-    email_addresses::EmailAddress,
-    mailer::{Mailer, MailerError},
-};
+use crate::domain::communication::mailer::{Mailer, MailerError, Message};
 
 /// SMTP configuration
 #[derive(Clone, Default, Debug, Parser)]
@@ -87,20 +84,20 @@ impl SMTPMailer {
 
 #[async_trait]
 impl Mailer for SMTPMailer {
-    async fn send_email(
-        &self,
-        to: &EmailAddress,
-        subject: &str,
-        html: &str,
-        plain: &str,
-    ) -> Result<(), MailerError> {
-        let email = Message::builder()
-            .from(self.config.sender.parse()?)
-            .to(to.to_string().parse()?)
-            .subject(subject.to_string())
+    async fn send_email(&self, message: Message) -> Result<(), MailerError> {
+        let from = if let Some(from) = message.from {
+            from.to_string()
+        } else {
+            self.config.sender.clone()
+        };
+
+        let email = lettre::Message::builder()
+            .from(from.parse()?)
+            .to(message.to.to_string().parse()?)
+            .subject(message.subject)
             .multipart(MultiPart::alternative_plain_html(
-                String::from(plain),
-                String::from(html),
+                String::from(message.plain_body),
+                String::from(message.html_body),
             ))?;
 
         match self.mailer()?.send(&email) {
